@@ -28,6 +28,8 @@
 
 /// Async database connection, schema management, and CRUD operations.
 pub mod db;
+/// Floating-point math utilities shared by the build and search pipelines.
+pub mod math;
 /// The [`Doc`] type representing a documentation file.
 pub mod doc;
 /// The [`LoreError`] type used throughout the workspace.
@@ -45,4 +47,5 @@ pub use doc::Doc;
 pub use error::LoreError;
 pub use node::{NewNode, Node, NodeKind};
 pub use package::{Package, PackageMetadata};
+pub use math::cosine_similarity;
 pub use search::{SearchConfig, SearchResult, ScoredNode};

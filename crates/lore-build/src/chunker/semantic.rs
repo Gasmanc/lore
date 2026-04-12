@@ -7,6 +7,9 @@
 
 use lore_core::NodeKind;
 
+// Re-export so embedder tests can import `crate::chunker::semantic::cosine_similarity`.
+pub use lore_core::cosine_similarity;
+
 use crate::{
     embedder::Embedder,
     parser::ContentBlock,
@@ -93,20 +96,6 @@ impl SemanticRefiner {
 
         Ok(merged)
     }
-}
-
-// ── Cosine similarity ─────────────────────────────────────────────────────────
-
-/// Compute the cosine similarity between two equal-length vectors.
-///
-/// Returns `0.0` if either vector has zero magnitude.
-#[must_use]
-pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    debug_assert_eq!(a.len(), b.len(), "vectors must have the same length");
-    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-    let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if mag_a == 0.0 || mag_b == 0.0 { 0.0 } else { dot / (mag_a * mag_b) }
 }
 
 // ── Valley detection ──────────────────────────────────────────────────────────
@@ -278,19 +267,6 @@ mod tests {
     }
 
     // ── Unit tests (no embedder required) ────────────────────────────────────
-
-    #[test]
-    fn test_cosine_similarity_identical() {
-        let v = vec![1.0f32, 0.0, 0.0];
-        assert!((cosine_similarity(&v, &v) - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_cosine_similarity_orthogonal() {
-        let a = vec![1.0f32, 0.0, 0.0];
-        let b = vec![0.0f32, 1.0, 0.0];
-        assert!((cosine_similarity(&a, &b) - 0.0).abs() < 1e-6);
-    }
 
     #[test]
     fn test_valley_no_split_uniform() {
