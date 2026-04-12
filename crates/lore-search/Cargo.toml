@@ -1,0 +1,11 @@
+[package]
+name        = "lore-search"
+description = "BM25, vector search, RRF, MMR, and token budget for Lore"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+lore-core = { path = "../lore-core" }

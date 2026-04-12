@@ -1,0 +1,21 @@
+[package]
+name        = "lore-core"
+description = "Shared types, database schema, and connection management for Lore"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+thiserror      = { workspace = true }
+tokio          = { workspace = true }
+tracing        = { workspace = true }
+rusqlite       = { workspace = true }
+tokio-rusqlite = { workspace = true }
+sqlite-vec     = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

@@ -1,0 +1,15 @@
+[package]
+name        = "lore-cli"
+description = "The lore command-line interface"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+repository.workspace = true
+
+[[bin]]
+name = "lore"
+path = "src/main.rs"
+
+[dependencies]
+lore-core = { path = "../lore-core" }

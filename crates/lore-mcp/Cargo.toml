@@ -1,0 +1,11 @@
+[package]
+name        = "lore-mcp"
+description = "MCP server and tool definitions for Lore"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+lore-core = { path = "../lore-core" }
