@@ -556,6 +556,37 @@ impl Db {
             .map_err(LoreError::from)
     }
 
+    /// Returns the [`Doc`] with the given `path`, or `None` if not found.
+    pub async fn get_doc_by_path(&self, path: String) -> Result<Option<Doc>, LoreError> {
+        self.conn
+            .call(move |db| {
+                let mut stmt =
+                    db.prepare_cached("SELECT id, path, title FROM docs WHERE path = ?1")?;
+                let mut rows = stmt.query(params![path])?;
+                rows.next()?
+                    .map(|row| {
+                        Ok(Doc { id: row.get(0)?, path: row.get(1)?, title: row.get(2)? })
+                    })
+                    .transpose()
+            })
+            .await
+            .map_err(LoreError::from)
+    }
+
+    /// Returns all nodes belonging to `doc_id`, ordered by insertion order.
+    pub async fn get_nodes_for_doc(&self, doc_id: i64) -> Result<Vec<Node>, LoreError> {
+        self.conn
+            .call(move |db| {
+                let mut stmt = db.prepare(&format!(
+                    "SELECT {NODE_COLUMNS} FROM nodes WHERE doc_id = ?1 ORDER BY id"
+                ))?;
+                stmt.query_map(params![doc_id], node_from_row)?
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .await
+            .map_err(LoreError::from)
+    }
+
     /// Runs `PRAGMA optimize` and `VACUUM` to compact and tune the database
     /// after a build has finished.
     pub async fn optimize(&self) -> Result<(), LoreError> {

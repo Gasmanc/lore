@@ -18,6 +18,10 @@ tracing        = { workspace = true }
 tiktoken-rs    = { workspace = true }
 fastembed      = { workspace = true }
 walkdir        = { workspace = true }
+tokio          = { workspace = true }
+git2           = { workspace = true }
+reqwest        = { workspace = true }
+md5            = { workspace = true }
 
 dirs-next = { workspace = true }
 

@@ -106,8 +106,19 @@ impl ChunkTree {
         idx
     }
 
+    /// Returns `true` if the tree contains no chunks.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
     /// Iterate over all chunks.
     pub fn iter(&self) -> impl Iterator<Item = &(RawChunk, Option<usize>)> {
         self.nodes.iter()
+    }
+
+    /// Consume the tree, returning an iterator over all `(chunk, parent_index)` pairs.
+    pub fn consume(self) -> impl Iterator<Item = (RawChunk, Option<usize>)> {
+        self.nodes.into_iter()
     }
 }

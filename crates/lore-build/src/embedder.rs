@@ -6,6 +6,7 @@
 //! contextual-retrieval pattern for ~35% better retrieval recall.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use lore_core::LoreError;
@@ -22,8 +23,12 @@ const BATCH_SIZE: usize = 32;
 ///
 /// Initialisation downloads the model on first use (~130 MB, cached in
 /// `cache_dir`).  All subsequent calls use the local cache.
+///
+/// `Embedder` is cheaply cloneable — all clones share the same underlying
+/// model instance via [`Arc`].
+#[derive(Clone)]
 pub struct Embedder {
-    model: TextEmbedding,
+    model: Arc<TextEmbedding>,
 }
 
 impl Embedder {
@@ -48,7 +53,7 @@ impl Embedder {
         let model = TextEmbedding::try_new(opts)
             .map_err(|e| LoreError::Embed(format!("model init failed: {e}")))?;
 
-        Ok(Self { model })
+        Ok(Self { model: Arc::new(model) })
     }
 
     /// Embed a single text string and return the 384-dimensional vector.
