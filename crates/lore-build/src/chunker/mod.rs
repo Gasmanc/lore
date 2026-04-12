@@ -63,6 +63,9 @@ pub struct RawChunk {
     pub doc_title: Option<String>,
     /// Whether this is a prose [`NodeKind::Chunk`] or a [`NodeKind::CodeBlock`].
     pub kind: NodeKind,
+    /// Source heading levels parallel to [`heading_path`], preserving the
+    /// original document structure (e.g. `[2, 3, 4]` for `H2 > H3 > H4`).
+    pub heading_levels: Vec<u8>,
 }
 
 impl RawChunk {

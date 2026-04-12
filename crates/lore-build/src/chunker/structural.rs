@@ -39,16 +39,20 @@ impl StructuralChunker {
     /// `doc_path` is stored verbatim on every chunk (for the `docs` table
     /// foreign key).  `primary_level` controls which heading level triggers a
     /// new chunk boundary — typically returned by
-    /// [`crate::detect_primary_heading_level`].
+    /// [`crate::detect_primary_heading_level`].  Headings deeper than
+    /// `primary_level` have their content folded into the nearest ancestor
+    /// chunk rather than forming separate chunks.
     #[must_use]
-    pub fn chunk(&self, doc: &ParsedDoc, doc_path: &str, _primary_level: u8) -> ChunkTree {
+    pub fn chunk(&self, doc: &ParsedDoc, doc_path: &str, primary_level: u8) -> ChunkTree {
         let mut tree = ChunkTree::new();
         walk(
             &doc.root,
             None,
             &[],
+            &[],
             doc_path,
             doc.title.as_deref(),
+            primary_level,
             &mut tree,
             &self.counter,
             &self.config,
@@ -63,29 +67,61 @@ impl StructuralChunker {
 ///
 /// Returns the index of the prose chunk created for `node` (if any), so that
 /// child headings can record it as their parent.
+///
+/// `primary_level` controls chunk granularity: headings deeper (higher
+/// `level` value) than `primary_level` have their blocks folded into the
+/// nearest ancestor chunk rather than forming separate chunks.
 #[allow(clippy::too_many_arguments)] // all parameters carry distinct state
 fn walk(
     node: &HeadingNode,
     parent_chunk_idx: Option<usize>,
     heading_path: &[String],
+    heading_levels: &[u8],
     doc_path: &str,
     doc_title: Option<&str>,
+    primary_level: u8,
     tree: &mut ChunkTree,
     counter: &TokenCounter,
     config: &ChunkConfig,
 ) -> Option<usize> {
     // Build the path for this heading level.
     let mut path = heading_path.to_vec();
+    let mut levels = heading_levels.to_vec();
     if node.level > 0 {
         path.push(node.title.clone());
+        levels.push(node.level);
     }
+
+    // Headings deeper than primary_level fold their content into the parent
+    // chunk instead of creating a new boundary.  The root node (level 0) and
+    // headings at or above primary_level always emit their own chunks.
+    // If there is no parent chunk to fold into, a new chunk is created anyway.
+    let can_fold = node.level > primary_level && parent_chunk_idx.is_some();
 
     // Partition blocks: code goes to atomic chunks, prose accumulates.
     let (code_blocks, prose_blocks): (Vec<ContentBlock>, Vec<ContentBlock>) =
         node.blocks.iter().cloned().partition(|b| matches!(b, ContentBlock::Code { .. }));
 
     // ── Prose chunk ────────────────────────────────────────────────────────
-    let prose_idx: Option<usize> = if prose_blocks.is_empty() {
+    let prose_idx: Option<usize> = if can_fold {
+        // Fold: append blocks to the parent chunk instead of creating a new one.
+        let parent_idx = parent_chunk_idx.expect("checked by can_fold");
+        if !prose_blocks.is_empty() {
+            let (parent_chunk, _) = &mut tree.nodes[parent_idx];
+            parent_chunk.blocks.extend(prose_blocks);
+            // Re-count tokens after merge.
+            let text: String = parent_chunk
+                .blocks
+                .iter()
+                .map(ContentBlock::text)
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            parent_chunk.token_count = counter.count(&text);
+            parent_chunk.needs_refinement = parent_chunk.token_count > config.soft_max_tokens;
+        }
+        // Return parent as the effective chunk for children.
+        parent_chunk_idx
+    } else if prose_blocks.is_empty() {
         // No prose content at this level — pass the parent down unchanged so
         // child chunks are still properly linked.
         parent_chunk_idx
@@ -97,6 +133,7 @@ fn walk(
 
         let chunk = RawChunk {
             heading_path: path.clone(),
+            heading_levels: levels.clone(),
             blocks: prose_blocks,
             token_count,
             has_code: false,
@@ -113,6 +150,7 @@ fn walk(
         let token_count = counter.count(block.text());
         let chunk = RawChunk {
             heading_path: path.clone(),
+            heading_levels: levels.clone(),
             blocks: vec![block],
             token_count,
             has_code: true,
@@ -130,7 +168,7 @@ fn walk(
     // Children use the prose chunk of this heading as their parent so they
     // nest correctly in the path enumeration.
     for child in &node.children {
-        walk(child, prose_idx, &path, doc_path, doc_title, tree, counter, config);
+        walk(child, prose_idx, &path, &levels, doc_path, doc_title, primary_level, tree, counter, config);
     }
 
     prose_idx

@@ -118,8 +118,9 @@ Set the environment variable `MY_LIB_PORT=8080`.
 
 #[test]
 fn test_chunk_tree_parent_links_correct() {
-    // H2 "Parent" > H3 "Child".  The Child's prose chunk should have the
-    // Parent's prose chunk as its parent.
+    // H2 "Parent" > H3 "Child".  With primary_level=2, the H3 content is
+    // folded into the H2 chunk (since H3 > primary_level and a parent chunk
+    // exists).
     let d = doc(
         "Nested",
         vec![heading(
@@ -130,6 +131,28 @@ fn test_chunk_tree_parent_links_correct() {
         )],
     );
     let tree = chunker().chunk(&d, "test.md", 2);
+
+    // H3 content folds into the H2 chunk → single merged chunk.
+    assert_eq!(tree.nodes.len(), 1, "H3 should fold into H2 when primary_level=2");
+    assert!(tree.nodes[0].1.is_none(), "Parent should have no parent");
+    // Merged chunk contains both Parent and Child blocks.
+    assert_eq!(tree.nodes[0].0.blocks.len(), 2);
+}
+
+#[test]
+fn test_chunk_tree_parent_links_with_deep_primary() {
+    // H2 "Parent" > H3 "Child".  With primary_level=3, H3 is at or below
+    // the boundary so it gets its own chunk.
+    let d = doc(
+        "Nested",
+        vec![heading(
+            2,
+            "Parent",
+            vec![para("Parent content.")],
+            vec![heading(3, "Child", vec![para("Child content.")], vec![])],
+        )],
+    );
+    let tree = chunker().chunk(&d, "test.md", 3);
 
     // Two prose chunks: Parent (idx=0, parent=None) and Child (idx=1, parent=Some(0)).
     assert_eq!(tree.nodes.len(), 2);

@@ -168,6 +168,7 @@ fn make_segment(original: &RawChunk, blocks: Vec<ContentBlock>) -> RawChunk {
     // Mark needs_refinement = false — this segment is already refined.
     RawChunk {
         heading_path: original.heading_path.clone(),
+        heading_levels: original.heading_levels.clone(),
         blocks,
         token_count: 0, // recalculated by merge_tiny_segments
         has_code: false,
@@ -256,6 +257,7 @@ mod tests {
         let token_count = counter.count(&text);
         RawChunk {
             heading_path: vec!["Section".into()],
+            heading_levels: vec![2],
             blocks,
             token_count,
             has_code: false,
