@@ -12,8 +12,10 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use console::style;
+use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use lore_core::{LoreError, Package};
+use lore_registry::RegistryClient;
 
 /// Maximum number of content characters shown in a search result preview.
 const PREVIEW_LEN: usize = 200;
@@ -109,7 +111,7 @@ async fn main() {
     let packages_dir = cli.packages_dir.unwrap_or_else(default_packages_dir);
 
     let result = match cli.command {
-        Command::Add { package, version } => cmd_add(package, version).await,
+        Command::Add { package, version } => cmd_add(package, version, &packages_dir).await,
         Command::Remove { package } => cmd_remove(package, &packages_dir),
         Command::List => cmd_list(&packages_dir).await,
         Command::Search { package, query, budget } => {
@@ -139,14 +141,64 @@ async fn main() {
 
 // ── Command implementations ────────────────────────────────────────────────────
 
-/// `lore add <package>` — placeholder until lore-registry is implemented.
-async fn cmd_add(package: String, _version: Option<String>) -> Result<(), LoreError> {
-    eprintln!(
-        "{} Registry download is not yet implemented.\n\
-         To install a package manually, build it with:\n  \
-         lore build <source-dir> --name {package} --version <version>",
-        style("info:").blue().bold(),
-    );
+/// `lore add <package>` — search the registry and download a package.
+async fn cmd_add(
+    package: String,
+    version: Option<String>,
+    packages_dir: &std::path::Path,
+) -> Result<(), LoreError> {
+    let client = RegistryClient::new(RegistryClient::DEFAULT_URL)?;
+
+    let spinner = make_spinner(format!("Searching registry for \"{package}\"…"));
+    let search_result = client.search(&package).await;
+    spinner.finish_and_clear();
+    let mut matches = search_result?;
+
+    if let Some(ref ver) = version {
+        matches.retain(|e| &e.metadata.package.version == ver);
+    }
+
+    if matches.is_empty() {
+        return Err(LoreError::NotFound(format!(
+            "no packages matching \"{package}\" found in the registry"
+        )));
+    }
+
+    // Choose which entry to install.
+    let entry = if matches.len() == 1 {
+        matches.remove(0)
+    } else {
+        let labels: Vec<String> = matches
+            .iter()
+            .map(|e| {
+                let key = e.metadata.package.display_key();
+                let desc = e.metadata.package.description.as_deref().unwrap_or("");
+                if desc.is_empty() { key } else { format!("{key} — {desc}") }
+            })
+            .collect();
+        // FuzzySelect::interact() is blocking — run it off the async reactor.
+        let idx: usize = tokio::task::spawn_blocking(move || {
+            FuzzySelect::with_theme(&ColorfulTheme::default())
+                .with_prompt("Select a package to install")
+                .items(&labels)
+                .default(0)
+                .interact()
+        })
+        .await
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))?
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))?;
+        matches.remove(idx)
+    };
+
+    let key = entry.metadata.package.display_key();
+    std::fs::create_dir_all(packages_dir).map_err(LoreError::Io)?;
+    let target = packages_dir.join(format!("{key}.db"));
+
+    let pb = ProgressBar::new_spinner();
+    println!("Downloading {}…", style(&key).bold());
+    client.download(&entry, &target, Some(&pb)).await?;
+
+    println!("{} Installed {}", style("✓").green().bold(), style(&key).bold());
     Ok(())
 }
 
@@ -254,14 +306,7 @@ async fn cmd_build(
 
     std::fs::create_dir_all(packages_dir).map_err(LoreError::Io)?;
 
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .expect("valid template"),
-    );
-    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
-    spinner.set_message(format!("Building {display_key}…"));
+    let spinner = make_spinner(format!("Building {display_key}…"));
 
     let cache = lore_mcp::model_cache_dir();
     let builder = tokio::task::spawn_blocking(move || lore_build::PackageBuilder::new(&cache))
@@ -290,6 +335,19 @@ async fn cmd_mcp(packages_dir: PathBuf) -> Result<(), LoreError> {
 }
 
 // ── Private helpers ────────────────────────────────────────────────────────────
+
+/// Creates a cyan spinner with `msg` already ticking.
+fn make_spinner(msg: impl Into<std::borrow::Cow<'static, str>>) -> ProgressBar {
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .expect("valid template"),
+    );
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    pb.set_message(msg);
+    pb
+}
 
 /// Returns the default packages directory: `~/.local/share/lore/packages`.
 fn default_packages_dir() -> PathBuf {
