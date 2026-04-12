@@ -563,6 +563,27 @@ impl Db {
             .map_err(LoreError::from)
     }
 
+    /// Deletes all nodes and their embeddings for a given `doc_id`.
+    ///
+    /// This is used before re-indexing a document so that a rebuild does not
+    /// duplicate nodes.  The doc record itself is kept (caller may delete it
+    /// separately with [`Db::delete_doc`]).
+    pub async fn delete_nodes_for_doc(&self, doc_id: i64) -> Result<(), LoreError> {
+        self.conn
+            .call(move |db| {
+                // Delete embeddings for all nodes belonging to this doc.
+                db.execute(
+                    "DELETE FROM node_embeddings WHERE rowid IN (SELECT id FROM nodes WHERE doc_id = ?1)",
+                    params![doc_id],
+                )?;
+                // Delete the nodes themselves (triggers update FTS).
+                db.execute("DELETE FROM nodes WHERE doc_id = ?1", params![doc_id])?;
+                Ok(())
+            })
+            .await
+            .map_err(LoreError::from)
+    }
+
     /// Returns the [`Doc`] with the given `path`, or `None` if not found.
     pub async fn get_doc_by_path(&self, path: String) -> Result<Option<Doc>, LoreError> {
         self.conn

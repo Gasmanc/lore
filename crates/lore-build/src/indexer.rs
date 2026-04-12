@@ -121,6 +121,11 @@ impl Indexer {
 
         let doc_id = self.db.insert_doc(path_str, doc.title).await?;
 
+        // Purge any existing nodes for this doc so rebuilds are idempotent.
+        // `insert_doc` is idempotent by path, but nodes are not — without this
+        // a second build against the same `.db` would duplicate every node.
+        self.db.delete_nodes_for_doc(doc_id).await?;
+
         // Pass 1: insert all heading and content nodes, collect texts to embed.
         // heading_path → node_id cache: each unique heading inserted once per doc.
         let mut heading_cache: HashMap<Vec<String>, i64> = HashMap::new();
@@ -129,7 +134,7 @@ impl Indexer {
 
         for (chunk, _) in refined.iter() {
             let parent_id = self
-                .ensure_heading_chain(&chunk.heading_path, doc_id, &mut heading_cache)
+                .ensure_heading_chain(&chunk.heading_path, &chunk.heading_levels, doc_id, &mut heading_cache)
                 .await?;
 
             let node_id = self.insert_chunk(chunk, doc_id, parent_id).await?;
@@ -182,14 +187,21 @@ impl Indexer {
     /// Walks `heading_path` and inserts any heading nodes that do not yet
     /// exist for this document, returning the `id` of the deepest heading.
     ///
+    /// `heading_levels` carries the original heading levels from the source
+    /// document (parallel to `heading_path`).  When a heading is first inserted,
+    /// its level is taken from this slice so that the stored level faithfully
+    /// reflects the source structure (e.g. an `H3` is stored as level 3, not
+    /// depth 2).
+    ///
     /// `heading_cache` maps the full heading path (as a `Vec<String>`) to the
     /// already-inserted node id, so duplicate headings across chunks are not
     /// re-inserted.
     async fn ensure_heading_chain(
         &self,
-        heading_path: &[String],
-        doc_id:        i64,
-        cache:         &mut HashMap<Vec<String>, i64>,
+        heading_path:   &[String],
+        heading_levels: &[u8],
+        doc_id:         i64,
+        cache:          &mut HashMap<Vec<String>, i64>,
     ) -> Result<Option<i64>, LoreError> {
         if heading_path.is_empty() {
             return Ok(None);
@@ -205,9 +217,14 @@ impl Indexer {
                 continue;
             }
 
-            // level: depth within the path, starting at 1.
+            // Use the source heading level when available, falling back to
+            // depth (which is correct for headings created before heading_levels
+            // was populated).
             #[allow(clippy::cast_possible_truncation)]
-            let level = depth as u8;
+            let level = heading_levels
+                .get(depth - 1)
+                .copied()
+                .unwrap_or(depth as u8);
             let title = heading_path[depth - 1].clone();
 
             let node_id = self
