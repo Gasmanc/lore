@@ -90,9 +90,32 @@ impl RawChunk {
 #[derive(Debug, Clone)]
 pub struct FoldedHeading {
     /// Full heading path from root down to this folded heading.
-    pub heading_path: Vec<String>,
+    heading_path: Vec<String>,
     /// Source heading levels parallel to `heading_path`.
-    pub heading_levels: Vec<u8>,
+    heading_levels: Vec<u8>,
+}
+
+impl FoldedHeading {
+    /// Creates a new `FoldedHeading`, enforcing the invariant that
+    /// `heading_path` and `heading_levels` are the same length.
+    pub fn new(heading_path: Vec<String>, heading_levels: Vec<u8>) -> Self {
+        debug_assert_eq!(
+            heading_path.len(),
+            heading_levels.len(),
+            "heading_path and heading_levels must have the same length"
+        );
+        Self { heading_path, heading_levels }
+    }
+
+    /// Returns the heading path.
+    pub fn heading_path(&self) -> &[String] {
+        &self.heading_path
+    }
+
+    /// Returns the source heading levels.
+    pub fn heading_levels(&self) -> &[u8] {
+        &self.heading_levels
+    }
 }
 
 /// A flat list of [`RawChunk`]s with parent-index back-links.
