@@ -41,7 +41,8 @@ TARGET="${ARCH}-${OS}"
 
 if [ -z "${LORE_VERSION:-}" ]; then
     LORE_VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-        | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+        | grep '"tag_name"' | head -1 \
+        | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 fi
 
 if [ -z "$LORE_VERSION" ]; then
@@ -62,7 +63,6 @@ trap 'rm -rf "$TMP"' EXIT
 curl -fsSL "${BASE_URL}/${ARCHIVE}" -o "${TMP}/${ARCHIVE}"
 curl -fsSL "${BASE_URL}/SHA256SUMS" -o "${TMP}/SHA256SUMS"
 
-# Verify checksum (sha256sum on Linux, shasum on macOS).
 cd "$TMP"
 if command -v sha256sum >/dev/null 2>&1; then
     grep "${ARCHIVE}" SHA256SUMS | sha256sum -c -
@@ -80,7 +80,6 @@ install -m 755 "lore-${LORE_VERSION}-${TARGET}/lore" "${BIN_DIR}/lore"
 
 echo "lore installed to ${BIN_DIR}/lore"
 
-# Remind user to add BIN_DIR to PATH if necessary.
 case ":${PATH}:" in
     *":${BIN_DIR}:"*) ;;
     *) echo "  Add ${BIN_DIR} to your PATH to use lore from any directory." ;;

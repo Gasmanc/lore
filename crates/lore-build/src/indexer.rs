@@ -2,9 +2,9 @@
 //!
 //! [`Indexer`] is the central coordinator for a single documentation file.
 //! It owns shared references to the pipeline components and exposes a single
-//! [`Indexer::index_file`] method.  All database I/O is async; the heavy
-//! compute (parsing, chunking, embedding) runs synchronously on the calling
-//! task.
+//! [`Indexer::index_file`] method.  All database I/O is async; parsing and
+//! chunking are synchronous.  Batch embedding runs in a `spawn_blocking` task
+//! so the Tokio reactor is never stalled by neural-network inference.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -89,14 +89,6 @@ impl Indexer {
     /// [`lore_core::Node`] — it should be a relative path from the package
     /// root so that the resulting `.db` is portable.
     ///
-    /// # Errors
-    ///
-    /// Returns [`LoreError`] if parsing, embedding, or any database operation
-    /// fails.  A failed file is logged and the error is propagated to the
-    /// caller so the builder can decide whether to abort or continue.
-    /// Parses, chunks, embeds, and inserts all nodes from `content` into the
-    /// database.
-    ///
     /// Returns per-file counts for the caller to accumulate into build stats.
     /// Returns `None` if no chunks were produced (e.g. empty file).
     ///
@@ -129,9 +121,11 @@ impl Indexer {
 
         let doc_id = self.db.insert_doc(path_str, doc.title).await?;
 
+        // Pass 1: insert all heading and content nodes, collect texts to embed.
         // heading_path → node_id cache: each unique heading inserted once per doc.
         let mut heading_cache: HashMap<Vec<String>, i64> = HashMap::new();
         let mut file_stats = FileStats::default();
+        let mut embed_queue: Vec<(i64, String)> = Vec::new();
 
         for (chunk, _) in refined.iter() {
             let parent_id = self
@@ -139,13 +133,26 @@ impl Indexer {
                 .await?;
 
             let node_id = self.insert_chunk(chunk, doc_id, parent_id).await?;
-
             file_stats.accumulate(chunk);
 
-            if let Some(content_text) = &chunk.text_for_embedding() {
-                let ctx_text = build_contextual_text(&chunk.heading_path, content_text);
-                let embedding = self.embedder.embed(&ctx_text)?;
-                self.db.insert_embedding(node_id, embedding).await?;
+            if let Some(content_text) = chunk.text_for_embedding() {
+                let ctx_text = build_contextual_text(&chunk.heading_path, &content_text);
+                embed_queue.push((node_id, ctx_text));
+            }
+        }
+
+        // Pass 2: batch-embed all texts in one blocking call, then persist.
+        // Grouping into a single spawn_blocking avoids reactor stalls and uses
+        // ONNX batch inference, which is faster than N individual calls.
+        if !embed_queue.is_empty() {
+            let texts: Vec<String> = embed_queue.iter().map(|(_, t)| t.clone()).collect();
+            let embedder = self.embedder.clone();
+            let embeddings = tokio::task::spawn_blocking(move || embedder.embed_batch(&texts))
+                .await
+                .map_err(|e| LoreError::Embed(e.to_string()))??;
+
+            for ((node_id, _), embedding) in embed_queue.iter().zip(embeddings) {
+                self.db.insert_embedding(*node_id, embedding).await?;
             }
         }
 
