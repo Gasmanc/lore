@@ -83,6 +83,18 @@ impl RawChunk {
 
 // ── ChunkTree ─────────────────────────────────────────────────────────────────
 
+/// A heading path and its parallel source heading levels.
+///
+/// Recorded for headings that were folded into a parent chunk so the indexer
+/// can still materialise them as structural heading nodes in the database.
+#[derive(Debug, Clone)]
+pub struct FoldedHeading {
+    /// Full heading path from root down to this folded heading.
+    pub heading_path: Vec<String>,
+    /// Source heading levels parallel to `heading_path`.
+    pub heading_levels: Vec<u8>,
+}
+
 /// A flat list of [`RawChunk`]s with parent-index back-links.
 ///
 /// Each entry is `(chunk, parent_index)`.  The parent index is the position
@@ -92,6 +104,10 @@ impl RawChunk {
 pub struct ChunkTree {
     /// The flattened chunk list with parent back-links.
     pub nodes: Vec<(RawChunk, Option<usize>)>,
+    /// Headings whose content was folded into a parent chunk.  The indexer
+    /// must still create heading nodes for these so the structural hierarchy
+    /// in the database faithfully reflects the source document.
+    pub folded_headings: Vec<FoldedHeading>,
 }
 
 impl ChunkTree {

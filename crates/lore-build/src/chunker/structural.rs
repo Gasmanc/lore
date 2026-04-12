@@ -8,7 +8,7 @@ use crate::{
     tokens::TokenCounter,
 };
 
-use super::{ChunkConfig, ChunkTree, RawChunk};
+use super::{ChunkConfig, ChunkTree, FoldedHeading, RawChunk};
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -105,11 +105,17 @@ fn walk(
     // ── Prose chunk ────────────────────────────────────────────────────────
     let prose_idx: Option<usize> = if can_fold {
         // Fold: append blocks to the parent chunk instead of creating a new one.
-        // The child heading's title is prepended as a paragraph so it remains
-        // searchable in the merged chunk (queries matching section titles still
-        // hit).  The heading node itself is still created in the DB by the
-        // indexer's `ensure_heading_chain` (via `heading_path`).
+        // The child heading's title is injected as a paragraph so it remains
+        // searchable, and the heading is recorded in `folded_headings` so the
+        // indexer still creates a structural heading node in the database.
         let parent_idx = parent_chunk_idx.expect("checked by can_fold");
+
+        // Record this heading for the indexer to materialise as a DB node.
+        tree.folded_headings.push(FoldedHeading {
+            heading_path: path.clone(),
+            heading_levels: levels.clone(),
+        });
+
         let (parent_chunk, _) = &mut tree.nodes[parent_idx];
 
         // Inject the folded heading title as inline context.

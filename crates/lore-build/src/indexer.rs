@@ -146,6 +146,16 @@ impl Indexer {
             }
         }
 
+        // Materialise folded headings as structural nodes so the DB hierarchy
+        // faithfully reflects the source document even though their content was
+        // merged into a parent chunk.  `ensure_heading_chain` is idempotent via
+        // `heading_cache`, so headings already created by chunk processing above
+        // are not duplicated.
+        for fh in &refined.folded_headings {
+            self.ensure_heading_chain(&fh.heading_path, &fh.heading_levels, doc_id, &mut heading_cache)
+                .await?;
+        }
+
         // Pass 2: batch-embed all texts in one blocking call, then persist.
         // Grouping into a single spawn_blocking avoids reactor stalls and uses
         // ONNX batch inference, which is faster than N individual calls.
@@ -171,6 +181,8 @@ impl Indexer {
     /// parent relationships.
     fn refine_tree(&self, tree: ChunkTree) -> Result<ChunkTree, LoreError> {
         let mut out = ChunkTree::new();
+        // Propagate folded headings — refinement does not affect them.
+        out.folded_headings = tree.folded_headings;
         for (chunk, parent_idx) in tree.nodes {
             if chunk.needs_refinement {
                 let sub_chunks = self.refiner.refine(chunk, &self.embedder)?;
@@ -389,5 +401,62 @@ mod tests {
             .index_file(Path::new("empty.md"), "")
             .await
             .expect("empty file must not error");
+    }
+
+    #[tokio::test]
+    async fn test_folded_headings_create_structural_nodes() {
+        // H2 "Guide" with prose, then H3 "Setup" with prose.  detect_primary
+        // will return 2, so H3 is folded into H2's chunk.  The H3 heading
+        // node must still exist in the database.
+        let db = Db::open_in_memory().await.expect("db open");
+        let indexer = make_indexer(db.clone());
+
+        let md = "## Guide\n\nIntro paragraph.\n\n### Setup\n\nInstall instructions.\n";
+        indexer
+            .index_file(Path::new("fold.md"), md)
+            .await
+            .expect("index should succeed");
+
+        // Collect all heading nodes for the doc.
+        let nodes = db.get_nodes_for_doc(1).await.expect("get nodes");
+        let headings: Vec<_> = nodes
+            .iter()
+            .filter(|n| n.kind == NodeKind::Heading)
+            .collect();
+
+        // Both H2 "Guide" and H3 "Setup" must exist as heading nodes.
+        assert_eq!(headings.len(), 2, "expected both H2 and folded H3 heading nodes");
+        assert_eq!(headings[0].title.as_deref(), Some("Guide"));
+        assert_eq!(headings[0].level, Some(2));
+        assert_eq!(headings[1].title.as_deref(), Some("Setup"));
+        assert_eq!(headings[1].level, Some(3));
+
+        // H3 "Setup" must be a child of H2 "Guide".
+        assert_eq!(headings[1].parent_id, Some(headings[0].id));
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_purges_stale_nodes() {
+        let db = Db::open_in_memory().await.expect("db open");
+        let indexer = make_indexer(db.clone());
+
+        // First build: file with content.
+        let md = "## Section\n\nContent here.\n";
+        indexer
+            .index_file(Path::new("doc.md"), md)
+            .await
+            .expect("first index");
+
+        let nodes_before = db.get_nodes_for_doc(1).await.expect("get nodes");
+        assert!(!nodes_before.is_empty(), "should have nodes after first build");
+
+        // Second build: same path, now empty.
+        indexer
+            .index_file(Path::new("doc.md"), "")
+            .await
+            .expect("second index (empty)");
+
+        let nodes_after = db.get_nodes_for_doc(1).await.expect("get nodes");
+        assert!(nodes_after.is_empty(), "stale nodes should be purged on empty rebuild");
     }
 }
