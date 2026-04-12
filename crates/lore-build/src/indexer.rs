@@ -152,7 +152,7 @@ impl Indexer {
         // `heading_cache`, so headings already created by chunk processing above
         // are not duplicated.
         for fh in &refined.folded_headings {
-            self.ensure_heading_chain(&fh.heading_path, &fh.heading_levels, doc_id, &mut heading_cache)
+            self.ensure_heading_chain(fh.heading_path(), fh.heading_levels(), doc_id, &mut heading_cache)
                 .await?;
         }
 
@@ -215,6 +215,12 @@ impl Indexer {
         doc_id:         i64,
         cache:          &mut HashMap<Vec<String>, i64>,
     ) -> Result<Option<i64>, LoreError> {
+        debug_assert_eq!(
+            heading_path.len(),
+            heading_levels.len(),
+            "heading_path and heading_levels must have the same length"
+        );
+
         if heading_path.is_empty() {
             return Ok(None);
         }

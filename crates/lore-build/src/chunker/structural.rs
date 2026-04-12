@@ -110,16 +110,19 @@ fn walk(
         // indexer still creates a structural heading node in the database.
         let parent_idx = parent_chunk_idx.expect("checked by can_fold");
 
-        // Record this heading for the indexer to materialise as a DB node.
-        tree.folded_headings.push(FoldedHeading {
-            heading_path: path.clone(),
-            heading_levels: levels.clone(),
-        });
+        // Record this heading for the indexer to materialise as a DB node,
+        // but only if it has a meaningful title.
+        if !node.title.trim().is_empty() {
+            tree.folded_headings.push(FoldedHeading::new(
+                path.clone(),
+                levels.clone(),
+            ));
+        }
 
         let (parent_chunk, _) = &mut tree.nodes[parent_idx];
 
         // Inject the folded heading title as inline context.
-        if !node.title.is_empty() {
+        if !node.title.trim().is_empty() {
             parent_chunk
                 .blocks
                 .push(ContentBlock::Paragraph(node.title.clone()));
