@@ -1,0 +1,11 @@
+[package]
+name        = "lore-registry"
+description = "Registry API client, package download, and YAML definitions for Lore"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+lore-core = { path = "../lore-core" }

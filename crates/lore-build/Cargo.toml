@@ -1,0 +1,25 @@
+[package]
+name        = "lore-build"
+description = "Document parsing, chunking, embedding, and indexing pipeline for Lore"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+repository.workspace = true
+
+[dependencies]
+lore-core      = { path = "../lore-core" }
+pulldown-cmark = { workspace = true }
+scraper        = { workspace = true }
+htmd           = { workspace = true }
+serde          = { workspace = true }
+serde_yaml     = { workspace = true }
+tracing        = { workspace = true }
+tiktoken-rs    = { workspace = true }
+fastembed      = { workspace = true }
+walkdir        = { workspace = true }
+
+dirs-next = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
