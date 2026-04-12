@@ -50,7 +50,7 @@ fastembed     = "4"
 tiktoken-rs   = "0.6"
 
 # MCP
-rmcp          = { version = "0.2", features = ["server", "transport-io"] }
+rmcp          = { version = "0.2", features = ["server", "transport-io", "macros"] }
 
 [profile.dev]
 opt-level = 0
