@@ -314,17 +314,30 @@ async fn cmd_build(
         .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))?
         ?;
 
+    let meta_ref = meta.clone();
     let stats = builder
         .build(&source_dir, meta, &output_path, exclude_examples)
         .await?;
 
     spinner.finish_and_clear();
+
+    // Write the JSON manifest sidecar so registry tooling can read build stats.
+    let manifest_path = lore_build::write_manifest(&output_path, &meta_ref, &stats)
+        .map_err(|e| {
+            tracing::warn!(error = %e, "manifest write failed (non-fatal)");
+            e
+        })
+        .ok();
+
     println!(
         "{} Built {} → {}",
         style("✓").green().bold(),
         style(&display_key).bold(),
         output_path.display(),
     );
+    if let Some(mp) = manifest_path {
+        println!("    manifest: {}", mp.display());
+    }
     println!("{}", stats.summary());
     Ok(())
 }
