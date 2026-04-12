@@ -8,4 +8,11 @@ license.workspace    = true
 repository.workspace = true
 
 [dependencies]
-lore-core = { path = "../lore-core" }
+lore-core   = { path = "../lore-core" }
+lore-build  = { path = "../lore-build" }
+lore-search = { path = "../lore-search" }
+rmcp        = { workspace = true }
+serde       = { workspace = true }
+tokio       = { workspace = true }
+tracing     = { workspace = true }
+dirs-next   = { workspace = true }
