@@ -13,6 +13,7 @@ pulldown-cmark = { workspace = true }
 scraper        = { workspace = true }
 htmd           = { workspace = true }
 serde          = { workspace = true }
+serde_json     = { workspace = true }
 serde_yaml     = { workspace = true }
 tracing        = { workspace = true }
 tiktoken-rs    = { workspace = true }
