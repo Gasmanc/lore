@@ -55,6 +55,9 @@ pub struct ScoredNode {
 pub struct SearchResult {
     /// The matched node.
     pub node: Node,
+    /// Path of the source document relative to the documentation root,
+    /// e.g. `"docs/caching/overview.md"`.
+    pub doc_path: String,
     /// Title of the document this node belongs to.
     pub doc_title: String,
     /// Ordered list of heading titles from the document root to this node's

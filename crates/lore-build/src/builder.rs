@@ -94,6 +94,14 @@ impl PackageBuilder {
         Ok(Self { embedder, config: ChunkConfig::default() })
     }
 
+    /// Returns the [`Embedder`] used by this builder.
+    ///
+    /// Callers that need to embed query strings can reuse this instance rather
+    /// than loading a second copy of the model.
+    pub const fn embedder(&self) -> &Embedder {
+        &self.embedder
+    }
+
     /// Builds a package from `source_dir` and writes it to `output_path`.
     ///
     /// `meta` is written to the `meta` table after all documents are indexed.

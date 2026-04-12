@@ -40,8 +40,10 @@ pub async fn resolve(db: &Db, nodes: Vec<ScoredNode>) -> Result<Vec<SearchResult
             .cloned()
             .unwrap_or_default();
 
+        let doc_path = doc.map(|d| d.path.clone()).unwrap_or_default();
         results.push(SearchResult {
-            node:  scored.node,
+            node: scored.node,
+            doc_path,
             doc_title,
             heading_path,
             score: scored.score,

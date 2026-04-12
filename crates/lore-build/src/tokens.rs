@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn test_token_count_code() {
-        let code = r#"pub fn fibonacci(n: u64) -> u64 {
+        let code = r"pub fn fibonacci(n: u64) -> u64 {
     match n {
         0 => 0,
         1 => 1,
@@ -83,7 +83,7 @@ mod tests {
     fn test_fib() {
         assert_eq!(fibonacci(10), 55);
     }
-}"#;
+}";
         let count = counter().count(code);
         // Code tokenises more finely than prose: more tokens per character.
         // Assert count > len / 6 (i.e. average of at least 1 token per 6 chars).

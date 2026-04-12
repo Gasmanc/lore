@@ -1795,6 +1795,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lore-bench"
+version = "0.1.0"
+dependencies = [
+ "lore-build",
+ "lore-core",
+ "lore-mcp",
+ "lore-search",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "lore-build"
 version = "0.1.0"
 dependencies = [

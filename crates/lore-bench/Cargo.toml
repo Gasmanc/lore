@@ -1,0 +1,22 @@
+[package]
+name        = "lore-bench"
+description = "Retrieval quality benchmarks for the Lore search pipeline"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+repository.workspace = true
+
+[[bin]]
+name = "lore-bench"
+path = "src/main.rs"
+
+[dependencies]
+lore-build  = { path = "../lore-build" }
+lore-mcp    = { path = "../lore-mcp" }
+lore-search = { path = "../lore-search" }
+lore-core   = { path = "../lore-core" }
+tokio       = { workspace = true }
+tracing     = { workspace = true }
+tracing-subscriber = { workspace = true }
+tempfile    = { workspace = true }
