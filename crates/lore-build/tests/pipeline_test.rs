@@ -135,8 +135,8 @@ fn test_chunk_tree_parent_links_correct() {
     // H3 content folds into the H2 chunk → single merged chunk.
     assert_eq!(tree.nodes.len(), 1, "H3 should fold into H2 when primary_level=2");
     assert!(tree.nodes[0].1.is_none(), "Parent should have no parent");
-    // Merged chunk contains both Parent and Child blocks.
-    assert_eq!(tree.nodes[0].0.blocks.len(), 2);
+    // Merged chunk: Parent prose + folded "Child" heading title + Child prose.
+    assert_eq!(tree.nodes[0].0.blocks.len(), 3);
 }
 
 #[test]
