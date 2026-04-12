@@ -29,7 +29,7 @@ sqlite-vec    = "0.1.9"
 # CLI
 clap          = { version = "4", features = ["derive", "env"] }
 indicatif     = "0.17"
-dialoguer     = "0.11"
+dialoguer     = { version = "0.11", features = ["fuzzy-select"] }
 console       = "0.15"
 
 # HTTP / networking
