@@ -1,4 +1,4 @@
-//! Registry API client and package download pipeline for Lore.
+//! Registry API client, package download, and YAML spec loading for Lore.
 //!
 //! [`RegistryClient`] fetches the package index from a remote registry,
 //! searches it, and streams package `.db` files to disk with an optional
@@ -25,6 +25,9 @@
     clippy::missing_errors_doc,
     clippy::must_use_candidate
 )]
+
+pub mod spec;
+pub use spec::{BuildOptions, PackageSpec, SourceSpec, load_spec, load_all_specs};
 
 use std::path::Path;
 

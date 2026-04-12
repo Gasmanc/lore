@@ -1808,6 +1808,7 @@ dependencies = [
  "reqwest",
  "scraper",
  "serde",
+ "serde_json",
  "serde_yaml",
  "tempfile",
  "tiktoken-rs",
@@ -1873,6 +1874,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tokio",
  "tracing",
 ]

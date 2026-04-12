@@ -1,0 +1,170 @@
+name: Build Registry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Specific package to rebuild (e.g. npm/next). Leave blank to rebuild all."
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  discover:
+    name: Discover packages
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.scan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan package specs
+        id: scan
+        env:
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+        run: |
+          if [ -n "$INPUT_PACKAGE" ]; then
+            spec="packages/${INPUT_PACKAGE}.yaml"
+            matrix=$(printf '["%s"]' "$spec" | jq -c '.')
+          else
+            matrix=$(find packages -maxdepth 2 -name '*.yaml' | sort | jq -R . | jq -sc '.')
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.spec }}
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        spec: ${{ fromJson(needs.discover.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build lore CLI
+        run: cargo build --release -p lore-cli
+
+      - name: Build package from spec
+        id: build-pkg
+        env:
+          SPEC: ${{ matrix.spec }}
+        run: |
+          # Extract top-level fields from YAML (no yq dependency).
+          get() { awk -v key="$1:" '$0 ~ "^"key { gsub(/^[^:]+: *"|"$/, ""); print; exit }' "$SPEC"; }
+          name=$(get name)
+          version=$(get version)
+          registry=$(get registry)
+          description=$(get description)
+          source_url=$(get source_url)
+          source_type=$(awk '/^source:/{found=1} found && /type:/{gsub(/.*type: */, ""); print; exit}' "$SPEC")
+
+          outdir="dist"
+          mkdir -p "$outdir"
+          db="$outdir/${registry}-${name}@${version}.db"
+
+          # Build optional flags only when values are non-empty.
+          desc_flag=${description:+--description "$description"}
+          url_flag=${source_url:+--source-url "$source_url"}
+
+          case "$source_type" in
+            git)
+              url=$(awk '/^source:/{found=1} found && /url:/{gsub(/.*url: */, ""); print; exit}' "$SPEC")
+              branch=$(awk '/^source:/{found=1} found && /branch:/{gsub(/.*branch: */, ""); print; exit}' "$SPEC")
+              subdir=$(awk '/^source:/{found=1} found && /subdir:/{gsub(/.*subdir: */, ""); print; exit}' "$SPEC")
+              git clone --depth 1 ${branch:+--branch "$branch"} "$url" _src
+              src="_src${subdir:+/$subdir}"
+              # shellcheck disable=SC2086
+              ./target/release/lore build "$src" \
+                --name "$name" --version "$version" --registry "$registry" \
+                $desc_flag $url_flag \
+                --output "$db"
+              ;;
+            local)
+              dir=$(awk '/^source:/{found=1} found && /dir:/{gsub(/.*dir: */, ""); print; exit}' "$SPEC")
+              # shellcheck disable=SC2086
+              ./target/release/lore build "$dir" \
+                --name "$name" --version "$version" --registry "$registry" \
+                $desc_flag $url_flag \
+                --output "$db"
+              ;;
+            website)
+              echo "Source type 'website' requires a live crawl and is not supported in CI."
+              echo "Remove this spec from packages/ or switch it to type: git."
+              exit 1
+              ;;
+            *)
+              echo "Unknown source type: '$source_type'"
+              exit 1
+              ;;
+          esac
+
+          # Derive a filesystem-safe artifact name (replace / with --, drop extension).
+          artifact=$(echo "$SPEC" | tr '/' '--' | sed 's/\.yaml$//')
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build-pkg.outputs.artifact }}
+          path: dist/
+
+  publish:
+    name: Publish to GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Build index.json
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          mapfile -d '' files < <(find dist -name '*.json' -print0 | sort -z)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo '[]' > dist/index.json
+          else
+            jq -s --arg repo "$REPO" \
+              'map(. + {download_url: ("https://github.com/\($repo)/releases/download/registry/" + .package.registry + "-" + .package.name + "@" + .package.version + ".db")})' \
+              "${files[@]}" > dist/index.json
+          fi
+
+      - name: Upload registry release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: registry
+          name: Package Registry
+          body: "Auto-published package registry index."
+          files: |
+            dist/*.db
+            dist/index.json

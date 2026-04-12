@@ -1,0 +1,9 @@
+name: requests
+registry: pypi
+version: "2.32.3"
+description: "HTTP for Humans"
+source_url: "https://github.com/psf/requests"
+source:
+  type: website
+  url: "https://requests.readthedocs.io/en/stable/"
+  max_pages: 100
