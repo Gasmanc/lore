@@ -1,0 +1,9 @@
+name: fastapi
+registry: pypi
+version: "0.115.12"
+description: "FastAPI framework, high performance, easy to learn"
+source_url: "https://github.com/fastapi/fastapi"
+source:
+  type: website
+  url: "https://fastapi.tiangolo.com/"
+  max_pages: 300

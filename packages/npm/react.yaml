@@ -1,0 +1,12 @@
+name: react
+registry: npm
+version: "19.1.0"
+description: "A JavaScript library for building user interfaces"
+source_url: "https://github.com/facebook/react"
+source:
+  type: git
+  url: "https://github.com/facebook/react"
+  branch: "v19.1.0"
+  subdir: website/src/content
+build:
+  exclude_examples: true
