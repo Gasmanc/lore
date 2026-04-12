@@ -211,10 +211,7 @@ impl ServerHandler for LoreServer {
 /// Returns [`LoreError`] if the embedder cannot be initialised or if
 /// the transport encounters a fatal I/O error.
 pub async fn serve_stdio(packages_dir: PathBuf) -> Result<(), LoreError> {
-    let cache = dirs_next::cache_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join("lore")
-        .join("models");
+    let cache = model_cache_dir();
     // Model loading (~130 MB) is CPU-bound and must not block the async reactor.
     let embedder = tokio::task::spawn_blocking(move || Embedder::new(&cache))
         .await
@@ -244,8 +241,16 @@ impl LoreServer {
     }
 }
 
+/// Returns the shared embedding model cache directory.
+pub fn model_cache_dir() -> PathBuf {
+    dirs_next::cache_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("lore")
+        .join("models")
+}
+
 /// Scan `packages_dir` for `*.db` files and return `(key, Package)` pairs.
-async fn scan_packages(
+pub async fn scan_packages(
     packages_dir: &Path,
 ) -> Result<Vec<(String, lore_core::Package)>, LoreError> {
     let dir = packages_dir.to_path_buf();
