@@ -28,6 +28,8 @@
 
 /// Package build orchestrator — coordinates the full pipeline.
 pub mod builder;
+/// Pluggable build sources: local directory, git repository, website crawler.
+pub mod source;
 /// Chunking pipeline: structural splitting and semantic refinement.
 pub mod chunker;
 /// File discovery — finds documentation files in a directory tree.
@@ -42,6 +44,7 @@ pub mod parser;
 pub mod tokens;
 
 pub use builder::{BuildStats, PackageBuilder};
+pub use source::{GitSource, LocalSource, PreparedSource, Source, WebsiteSource};
 pub use chunker::{ChunkConfig, ChunkTree, RawChunk, SemanticRefiner, StructuralChunker};
 pub use discovery::discover_files;
 pub use embedder::{build_contextual_text, Embedder, EMBEDDING_DIMS};
