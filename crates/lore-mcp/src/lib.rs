@@ -99,9 +99,11 @@ impl LoreServer {
         Parameters(p): Parameters<SearchParams>,
     ) -> Result<String, rmcp::Error> {
         let db = self.open_db(&p.package).await?;
-        let embedding = self
-            .embedder
-            .embed(&p.query)
+        let embedder = self.embedder.clone();
+        let query = p.query.clone();
+        let embedding = tokio::task::spawn_blocking(move || embedder.embed(&query))
+            .await
+            .map_err(|e| rmcp::Error::internal_error(e.to_string(), None))?
             .map_err(|e| rmcp::Error::internal_error(e.to_string(), None))?;
 
         let config = SearchConfig {
