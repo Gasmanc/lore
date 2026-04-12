@@ -220,9 +220,7 @@ mod tests {
             .collect();
         let doc = doc_with_root(vec![heading(2, "API", vec![], children)]);
         let tree = chunker().chunk(&doc, "api.md", 2);
-        let prose_chunks: Vec<_> =
-            tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::Chunk).collect();
-        assert_eq!(prose_chunks.len(), 10);
+        assert_eq!(tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::Chunk).count(), 10);
     }
 
     #[test]

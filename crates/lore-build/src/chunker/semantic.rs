@@ -287,7 +287,7 @@ mod tests {
     fn test_no_refinement_when_not_flagged() {
         let chunk = prose_chunk(&["Short paragraph."]);
         assert!(!chunk.needs_refinement);
-        let result = refiner().refine(chunk.clone(), &*EMBEDDER).unwrap();
+        let result = refiner().refine(chunk.clone(), &EMBEDDER).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].blocks.len(), chunk.blocks.len());
     }
@@ -297,7 +297,7 @@ mod tests {
         // With < 3 paragraphs, refinement is skipped even if flagged.
         let mut chunk = prose_chunk(&["Para one.", "Para two."]);
         chunk.needs_refinement = true;
-        let result = refiner().refine(chunk.clone(), &*EMBEDDER).unwrap();
+        let result = refiner().refine(chunk, &EMBEDDER).unwrap();
         assert_eq!(result.len(), 1);
     }
 
@@ -316,7 +316,7 @@ mod tests {
         let mut chunk = prose_chunk(&paragraphs);
         chunk.needs_refinement = true;
 
-        let result = refiner().refine(chunk, &*EMBEDDER).unwrap();
+        let result = refiner().refine(chunk, &EMBEDDER).unwrap();
         // Should remain as one chunk since all paragraphs are about the same topic.
         assert_eq!(
             result.len(),
@@ -344,7 +344,7 @@ mod tests {
         let mut chunk = prose_chunk(&paragraphs);
         chunk.needs_refinement = true;
 
-        let result = refiner().refine(chunk, &*EMBEDDER).unwrap();
+        let result = refiner().refine(chunk, &EMBEDDER).unwrap();
         // There should be at least two chunks after splitting.
         assert!(
             result.len() >= 2,
@@ -374,7 +374,7 @@ mod tests {
         let mut chunk = prose_chunk(&paragraphs);
         chunk.needs_refinement = true;
 
-        let result = refiner.refine(chunk, &*EMBEDDER).unwrap();
+        let result = refiner.refine(chunk, &EMBEDDER).unwrap();
 
         // Whatever split happened, no output chunk should be below min_tokens=20
         // (the "Notably." fragment must have been merged).

@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_html_basic() {
-        let html = r#"<!DOCTYPE html>
+        let html = r"<!DOCTYPE html>
 <html>
 <head><title>My Page</title></head>
 <body>
@@ -180,7 +180,7 @@ mod tests {
 <h2>Section One</h2>
 <p>Content of section one.</p>
 </body>
-</html>"#;
+</html>";
         let doc = parse(html);
         assert_eq!(doc.title.as_deref(), Some("My Page"));
         // Should have at least one heading in the tree.

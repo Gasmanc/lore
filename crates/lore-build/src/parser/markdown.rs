@@ -412,7 +412,7 @@ mod tests {
         let doc = parse(md);
         let h2 = &doc.root.children[0];
         let combined: String =
-            h2.blocks.iter().map(|b| b.text()).collect::<Vec<_>>().join(" ");
+            h2.blocks.iter().map(super::ContentBlock::text).collect::<Vec<_>>().join(" ");
         assert!(combined.contains("Inside JSX."));
         assert!(!combined.contains("<AppOnly>"));
     }

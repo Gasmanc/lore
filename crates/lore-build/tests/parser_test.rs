@@ -1,7 +1,7 @@
 //! Integration tests for the lore-build parser module.
 
 use lore_build::{
-    AsciidocParser, ContentBlock, HeadingNode, HtmlParser, MarkdownParser, ParsedDoc,
+    AsciidocParser, ContentBlock, HeadingNode, MarkdownParser,
     ParserRegistry, RstParser, detect_primary_heading_level,
     parser::Parser,
 };
