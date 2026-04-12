@@ -114,17 +114,17 @@ impl Indexer {
         let tree = self.chunker.chunk(&doc, &path_str, primary_level);
         let refined = self.refine_tree(tree)?;
 
+        // Ensure the doc record exists and purge any previously indexed nodes
+        // so rebuilds are idempotent.  This must happen *before* the empty
+        // check: a file that previously produced chunks but now yields none
+        // (e.g. edited to empty) must still have its stale nodes removed.
+        let doc_id = self.db.insert_doc(path_str, doc.title).await?;
+        self.db.delete_nodes_for_doc(doc_id).await?;
+
         if refined.is_empty() {
             debug!(path = %path.display(), "no chunks produced; skipping");
             return Ok(None);
         }
-
-        let doc_id = self.db.insert_doc(path_str, doc.title).await?;
-
-        // Purge any existing nodes for this doc so rebuilds are idempotent.
-        // `insert_doc` is idempotent by path, but nodes are not — without this
-        // a second build against the same `.db` would duplicate every node.
-        self.db.delete_nodes_for_doc(doc_id).await?;
 
         // Pass 1: insert all heading and content nodes, collect texts to embed.
         // heading_path → node_id cache: each unique heading inserted once per doc.

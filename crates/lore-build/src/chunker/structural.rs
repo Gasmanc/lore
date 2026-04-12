@@ -105,20 +105,31 @@ fn walk(
     // ── Prose chunk ────────────────────────────────────────────────────────
     let prose_idx: Option<usize> = if can_fold {
         // Fold: append blocks to the parent chunk instead of creating a new one.
+        // The child heading's title is prepended as a paragraph so it remains
+        // searchable in the merged chunk (queries matching section titles still
+        // hit).  The heading node itself is still created in the DB by the
+        // indexer's `ensure_heading_chain` (via `heading_path`).
         let parent_idx = parent_chunk_idx.expect("checked by can_fold");
-        if !prose_blocks.is_empty() {
-            let (parent_chunk, _) = &mut tree.nodes[parent_idx];
-            parent_chunk.blocks.extend(prose_blocks);
-            // Re-count tokens after merge.
-            let text: String = parent_chunk
+        let (parent_chunk, _) = &mut tree.nodes[parent_idx];
+
+        // Inject the folded heading title as inline context.
+        if !node.title.is_empty() {
+            parent_chunk
                 .blocks
-                .iter()
-                .map(ContentBlock::text)
-                .collect::<Vec<_>>()
-                .join("\n\n");
-            parent_chunk.token_count = counter.count(&text);
-            parent_chunk.needs_refinement = parent_chunk.token_count > config.soft_max_tokens;
+                .push(ContentBlock::Paragraph(node.title.clone()));
         }
+        parent_chunk.blocks.extend(prose_blocks);
+
+        // Re-count tokens after merge.
+        let text: String = parent_chunk
+            .blocks
+            .iter()
+            .map(ContentBlock::text)
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        parent_chunk.token_count = counter.count(&text);
+        parent_chunk.needs_refinement = parent_chunk.token_count > config.soft_max_tokens;
+
         // Return parent as the effective chunk for children.
         parent_chunk_idx
     } else if prose_blocks.is_empty() {
