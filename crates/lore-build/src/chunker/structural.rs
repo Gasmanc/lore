@@ -84,10 +84,12 @@ fn walk(
     counter: &TokenCounter,
     config: &ChunkConfig,
 ) -> Option<usize> {
-    // Build the path for this heading level.
+    // Build the path for this heading level.  Skip headings with empty or
+    // whitespace-only titles — they have no search value and would create
+    // useless heading nodes in the database.
     let mut path = heading_path.to_vec();
     let mut levels = heading_levels.to_vec();
-    if node.level > 0 {
+    if node.level > 0 && !node.title.trim().is_empty() {
         path.push(node.title.clone());
         levels.push(node.level);
     }
