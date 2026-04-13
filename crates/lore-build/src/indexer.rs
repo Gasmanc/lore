@@ -15,7 +15,7 @@ use tracing::{debug, instrument, warn};
 use crate::{
     chunker::{ChunkTree, RawChunk, SemanticRefiner, StructuralChunker},
     embedder::{Embedder, build_contextual_text},
-    parser::{ParserRegistry, detect_primary_heading_level},
+    parser::{ParsedDoc, ParserRegistry, detect_primary_heading_level},
 };
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -114,6 +114,38 @@ impl Indexer {
         let tree = self.chunker.chunk(&doc, &path_str, primary_level);
         let refined = self.refine_tree(tree)?;
 
+        // All database writes for this document are wrapped in a SAVEPOINT so
+        // that a failure at any stage (heading chain, chunk insert, embedding)
+        // rolls back to the previous good state rather than leaving a partially
+        // reindexed document.
+        let sp = "reindex".to_owned();
+        self.db.begin_savepoint(sp.clone()).await?;
+
+        let result = self.index_file_inner(path, path_str, doc, refined).await;
+
+        match result {
+            Ok(stats) => {
+                self.db.release_savepoint(sp).await?;
+                Ok(stats)
+            }
+            Err(e) => {
+                // Best-effort rollback; ignore the rollback error — the original
+                // error is more informative.
+                let _ = self.db.rollback_savepoint(sp).await;
+                Err(e)
+            }
+        }
+    }
+
+    /// Inner body of [`Indexer::index_file`], extracted so that the savepoint
+    /// wrapper in the outer function can catch any error and roll back cleanly.
+    async fn index_file_inner(
+        &self,
+        path:     &Path,
+        path_str: String,
+        doc:      ParsedDoc,
+        refined:  ChunkTree,
+    ) -> Result<Option<FileStats>, LoreError> {
         // Ensure the doc record exists and purge any previously indexed nodes
         // so rebuilds are idempotent.  This must happen *before* the empty
         // check: a file that previously produced chunks but now yields none

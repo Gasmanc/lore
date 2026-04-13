@@ -615,6 +615,41 @@ impl Db {
             .map_err(LoreError::from)
     }
 
+    /// Creates a named `SAVEPOINT`, allowing a logical unit of work to be
+    /// rolled back atomically without affecting any outer transaction.
+    ///
+    /// Pair with [`Db::release_savepoint`] on success or
+    /// [`Db::rollback_savepoint`] on failure.
+    pub async fn begin_savepoint(&self, name: String) -> Result<(), LoreError> {
+        self.conn
+            .call(move |db| db.execute_batch(&format!("SAVEPOINT \"{name}\"")))
+            .await
+            .map_err(LoreError::from)
+    }
+
+    /// Commits all work done since [`Db::begin_savepoint`] was called with
+    /// `name`, making the changes permanent (or visible to any outer
+    /// transaction).
+    pub async fn release_savepoint(&self, name: String) -> Result<(), LoreError> {
+        self.conn
+            .call(move |db| db.execute_batch(&format!("RELEASE \"{name}\"")))
+            .await
+            .map_err(LoreError::from)
+    }
+
+    /// Rolls back all work done since [`Db::begin_savepoint`] was called with
+    /// `name`, then releases the savepoint so it can be reused.
+    pub async fn rollback_savepoint(&self, name: String) -> Result<(), LoreError> {
+        self.conn
+            .call(move |db| {
+                db.execute_batch(&format!(
+                    "ROLLBACK TO SAVEPOINT \"{name}\"; RELEASE \"{name}\""
+                ))
+            })
+            .await
+            .map_err(LoreError::from)
+    }
+
     /// Runs `PRAGMA optimize` and `VACUUM` to compact and tune the database
     /// after a build has finished.
     pub async fn optimize(&self) -> Result<(), LoreError> {
