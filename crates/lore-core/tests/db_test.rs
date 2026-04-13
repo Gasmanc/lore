@@ -781,6 +781,50 @@ async fn test_get_package_meta_fails_without_required_keys() {
 // NodeKind helpers
 // ---------------------------------------------------------------------------
 
+#[tokio::test]
+async fn test_delete_nodes_for_doc_with_hierarchy() {
+    let db = open_db().await;
+    let doc_id = db
+        .insert_doc("docs/delete.md".to_owned(), None)
+        .await
+        .expect("insert_doc failed");
+
+    let h1 = db
+        .insert_node(NewNode {
+            parent_id: None,
+            doc_id,
+            kind: NodeKind::Heading,
+            level: Some(1),
+            title: Some("H1".to_owned()),
+            content: None,
+            token_count: 0,
+            lang: None,
+        })
+        .await
+        .expect("insert h1 failed");
+
+    db.insert_node(NewNode {
+        parent_id: Some(h1),
+        doc_id,
+        kind: NodeKind::Chunk,
+        level: None,
+        title: None,
+        content: Some("Child".to_owned()),
+        token_count: 1,
+        lang: None,
+    })
+    .await
+    .expect("insert child failed");
+
+    // Deleting nodes for the doc should succeed even with the H1 -> Chunk hierarchy.
+    db.delete_nodes_for_doc(doc_id)
+        .await
+        .expect("delete_nodes_for_doc failed with hierarchy");
+
+    let nodes = db.get_nodes_for_doc(doc_id).await.expect("get_nodes failed");
+    assert!(nodes.is_empty(), "nodes should be gone");
+}
+
 #[test]
 fn test_node_kind_as_str_roundtrip() {
     for kind in [NodeKind::Heading, NodeKind::Chunk, NodeKind::CodeBlock] {
@@ -794,4 +838,126 @@ fn test_node_kind_as_str_roundtrip() {
 fn test_node_kind_try_from_invalid_returns_error() {
     let result = NodeKind::try_from("unknown_kind");
     assert!(result.is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Savepoint (atomicity of re-index)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_savepoint_rollback_discards_changes() {
+    let db = open_db().await;
+    let doc_id = db
+        .insert_doc("sp_rollback.md".to_owned(), None)
+        .await
+        .expect("insert_doc failed");
+
+    // Begin savepoint, insert a node, then roll back.
+    db.begin_savepoint("reindex".to_owned()).await.expect("begin_savepoint failed");
+
+    let node_id = db
+        .insert_node(NewNode {
+            parent_id: None,
+            doc_id,
+            kind: NodeKind::Chunk,
+            level: None,
+            title: None,
+            content: Some("this should vanish".to_owned()),
+            token_count: 3,
+            lang: None,
+        })
+        .await
+        .expect("insert_node failed");
+
+    db.rollback_savepoint("reindex".to_owned()).await.expect("rollback_savepoint failed");
+
+    // Node must not be visible after the rollback.
+    let nodes = db.get_nodes_for_doc(doc_id).await.expect("get_nodes failed");
+    assert!(
+        nodes.is_empty(),
+        "rollback should have discarded the inserted node (node_id={node_id})"
+    );
+}
+
+#[tokio::test]
+async fn test_savepoint_release_persists_changes() {
+    let db = open_db().await;
+    let doc_id = db
+        .insert_doc("sp_release.md".to_owned(), None)
+        .await
+        .expect("insert_doc failed");
+
+    // Begin savepoint, insert a node, then release (commit).
+    db.begin_savepoint("reindex".to_owned()).await.expect("begin_savepoint failed");
+
+    let node_id = db
+        .insert_node(NewNode {
+            parent_id: None,
+            doc_id,
+            kind: NodeKind::Chunk,
+            level: None,
+            title: None,
+            content: Some("this should persist".to_owned()),
+            token_count: 3,
+            lang: None,
+        })
+        .await
+        .expect("insert_node failed");
+
+    db.release_savepoint("reindex".to_owned()).await.expect("release_savepoint failed");
+
+    // Node must be visible after the release.
+    let nodes = db.get_nodes_for_doc(doc_id).await.expect("get_nodes failed");
+    assert_eq!(nodes.len(), 1, "release should have persisted the inserted node");
+    assert_eq!(nodes[0].id, node_id);
+}
+
+#[tokio::test]
+async fn test_savepoint_rollback_preserves_prior_data() {
+    // Simulates a failed re-index: good nodes exist, a new (bad) write is rolled
+    // back, and the original nodes remain intact.
+    let db = open_db().await;
+    let doc_id = db
+        .insert_doc("sp_preserve.md".to_owned(), None)
+        .await
+        .expect("insert_doc failed");
+
+    // Insert a "good" node that represents the previously-indexed state.
+    let good_node_id = db
+        .insert_node(NewNode {
+            parent_id: None,
+            doc_id,
+            kind: NodeKind::Chunk,
+            level: None,
+            title: None,
+            content: Some("original good content".to_owned()),
+            token_count: 3,
+            lang: None,
+        })
+        .await
+        .expect("insert good node failed");
+
+    // Begin a re-index savepoint, delete the good node, insert a replacement,
+    // then roll back to simulate a mid-index failure.
+    db.begin_savepoint("reindex".to_owned()).await.expect("begin_savepoint failed");
+    db.delete_nodes_for_doc(doc_id).await.expect("delete_nodes_for_doc failed");
+    db.insert_node(NewNode {
+        parent_id: None,
+        doc_id,
+        kind: NodeKind::Chunk,
+        level: None,
+        title: None,
+        content: Some("bad replacement".to_owned()),
+        token_count: 2,
+        lang: None,
+    })
+    .await
+    .expect("insert bad node failed");
+    db.rollback_savepoint("reindex".to_owned()).await.expect("rollback_savepoint failed");
+
+    // Original good node must have been restored by the rollback.
+    let nodes = db.get_nodes_for_doc(doc_id).await.expect("get_nodes failed");
+    assert_eq!(nodes.len(), 1, "rollback should restore exactly the original node");
+    assert_eq!(nodes[0].id, good_node_id);
+    assert_eq!(nodes[0].content.as_deref(), Some("original good content"));
 }
