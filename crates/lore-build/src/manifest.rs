@@ -41,8 +41,8 @@ pub fn write_manifest(
         build_date: Some(utc_now_iso8601()),
     };
 
-    let json = serde_json::to_string_pretty(&metadata)
-        .map_err(|e| LoreError::Schema(e.to_string()))?;
+    let json =
+        serde_json::to_string_pretty(&metadata).map_err(|e| LoreError::Schema(e.to_string()))?;
 
     let manifest_path = db_path.with_extension("json");
     std::fs::write(&manifest_path, json.as_bytes()).map_err(LoreError::Io)?;
@@ -53,9 +53,7 @@ pub fn write_manifest(
 
 /// Returns the current UTC time as an ISO 8601 string (`YYYY-MM-DDTHH:MM:SSZ`).
 fn utc_now_iso8601() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
+    let secs = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
 
     let (y, mo, d, h, mi, s) = epoch_to_utc(secs);
     format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z")
@@ -68,8 +66,8 @@ fn utc_now_iso8601() -> String {
 /// Algorithm: <https://howardhinnant.github.io/date_algorithms.html>
 #[allow(clippy::many_single_char_names)]
 const fn epoch_to_utc(secs: u64) -> (u32, u32, u32, u32, u32, u32) {
-    let sec  = (secs % 60) as u32;
-    let min  = ((secs / 60) % 60) as u32;
+    let sec = (secs % 60) as u32;
+    let min = ((secs / 60) % 60) as u32;
     let hour = ((secs / 3600) % 24) as u32;
     let days = secs / 86400;
 
@@ -83,7 +81,7 @@ const fn epoch_to_utc(secs: u64) -> (u32, u32, u32, u32, u32, u32) {
     #[allow(clippy::cast_possible_wrap)]
     let y = yoe as i64 + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
-    let mp  = (5 * doy + 2) / 153; // [0, 11]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
     #[allow(clippy::cast_possible_truncation)]
     let day = (doy - (153 * mp + 2) / 5 + 1) as u32; // [1, 31]; value is always ≤31
     #[allow(clippy::cast_possible_truncation)]
@@ -113,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn write_manifest_creates_json(  ) {
+    fn write_manifest_creates_json() {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
         std::fs::write(&db_path, b"fake db").unwrap();
@@ -126,11 +124,7 @@ mod tests {
             source_url: None,
             git_sha: None,
         };
-        let stats = BuildStats {
-            chunk_count: 10,
-            code_block_count: 3,
-            ..Default::default()
-        };
+        let stats = BuildStats { chunk_count: 10, code_block_count: 3, ..Default::default() };
 
         let manifest_path = write_manifest(&db_path, &package, &stats).unwrap();
         assert!(manifest_path.exists());

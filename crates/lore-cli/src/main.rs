@@ -23,11 +23,7 @@ const PREVIEW_LEN: usize = 200;
 // ── CLI definition ─────────────────────────────────────────────────────────────
 
 #[derive(Parser)]
-#[command(
-    name = "lore",
-    about = "Local documentation server for AI coding assistants",
-    version
-)]
+#[command(name = "lore", about = "Local documentation server for AI coding assistants", version)]
 struct Cli {
     /// Override the default packages directory (~/.local/share/lore/packages).
     #[arg(long, env = "LORE_PACKAGES_DIR", global = true)]
@@ -255,8 +251,7 @@ async fn cmd_search(
     let cache = lore_mcp::model_cache_dir();
     let embedder = tokio::task::spawn_blocking(move || lore_build::Embedder::new(&cache))
         .await
-        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))?
-        ?;
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
 
     let embedding = embedder.embed(&query)?;
     let config = lore_core::SearchConfig { token_budget: budget, ..Default::default() };
@@ -311,13 +306,10 @@ async fn cmd_build(
     let cache = lore_mcp::model_cache_dir();
     let builder = tokio::task::spawn_blocking(move || lore_build::PackageBuilder::new(&cache))
         .await
-        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))?
-        ?;
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
 
     let meta_ref = meta.clone();
-    let stats = builder
-        .build(&source_dir, meta, &output_path, exclude_examples)
-        .await?;
+    let stats = builder.build(&source_dir, meta, &output_path, exclude_examples).await?;
 
     spinner.finish_and_clear();
 
@@ -353,9 +345,7 @@ async fn cmd_mcp(packages_dir: PathBuf) -> Result<(), LoreError> {
 fn make_spinner(msg: impl Into<std::borrow::Cow<'static, str>>) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
     pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .expect("valid template"),
+        ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}").expect("valid template"),
     );
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
     pb.set_message(msg);
@@ -364,8 +354,5 @@ fn make_spinner(msg: impl Into<std::borrow::Cow<'static, str>>) -> ProgressBar {
 
 /// Returns the default packages directory: `~/.local/share/lore/packages`.
 fn default_packages_dir() -> PathBuf {
-    dirs_next::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("lore")
-        .join("packages")
+    dirs_next::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("lore").join("packages")
 }

@@ -35,11 +35,7 @@ fn is_underline_line(line: &str, min_len: usize) -> Option<char> {
     if !UNDERLINE_CHARS.contains(&first) {
         return None;
     }
-    if line.chars().all(|c| c == first) && line.len() >= min_len {
-        Some(first)
-    } else {
-        None
-    }
+    if line.chars().all(|c| c == first) && line.len() >= min_len { Some(first) } else { None }
 }
 
 // ── Code directive enum ───────────────────────────────────────────────────────
@@ -54,15 +50,9 @@ enum CodeDirective {
 
 /// Parse `.. code-block:: lang` or `.. code:: lang` directive line.
 fn parse_code_directive(line: &str) -> Option<CodeDirective> {
-    let rest = line
-        .strip_prefix(".. code-block::")
-        .or_else(|| line.strip_prefix(".. code::"))?;
+    let rest = line.strip_prefix(".. code-block::").or_else(|| line.strip_prefix(".. code::"))?;
     let lang = rest.trim().to_owned();
-    Some(if lang.is_empty() {
-        CodeDirective::Anonymous
-    } else {
-        CodeDirective::WithLang(lang)
-    })
+    Some(if lang.is_empty() { CodeDirective::Anonymous } else { CodeDirective::WithLang(lang) })
 }
 
 // ── Core logic ────────────────────────────────────────────────────────────────
@@ -89,9 +79,7 @@ fn parse_rst(content: &str) -> ParsedDoc {
             let text = paragraph_buf.trim().to_owned();
             paragraph_buf.clear();
             if !text.is_empty() {
-                current_node(&mut stack, &mut root)
-                    .blocks
-                    .push(ContentBlock::Paragraph(text));
+                current_node(&mut stack, &mut root).blocks.push(ContentBlock::Paragraph(text));
             }
         }};
     }
@@ -101,10 +89,9 @@ fn parse_rst(content: &str) -> ParsedDoc {
             in_code = false;
             let code_content = std::mem::take(&mut code_buf);
             if !code_content.trim().is_empty() {
-                current_node(&mut stack, &mut root).blocks.push(ContentBlock::Code {
-                    lang: code_lang.take(),
-                    content: code_content,
-                });
+                current_node(&mut stack, &mut root)
+                    .blocks
+                    .push(ContentBlock::Code { lang: code_lang.take(), content: code_content });
             }
         }};
     }
@@ -148,22 +135,22 @@ fn parse_rst(content: &str) -> ParsedDoc {
             let min_len = candidate.trim().len();
             if let Some(ul_char) = is_underline_line(line.trim(), min_len) {
                 flush_paragraph!();
-                let level =
-                    char_to_level.iter().position(|&c| c == ul_char).map_or_else(
-                        || {
-                            char_to_level.push(ul_char);
-                            char_to_level.len()
-                        },
-                        |pos| pos + 1,
-                    );
+                let level = char_to_level.iter().position(|&c| c == ul_char).map_or_else(
+                    || {
+                        char_to_level.push(ul_char);
+                        char_to_level.len()
+                    },
+                    |pos| pos + 1,
+                );
                 // Heading levels beyond 6 are uncommon but technically valid RST.
                 #[allow(clippy::cast_possible_truncation)]
                 let level = level as u8;
-                let heading =
-                    HeadingNode { level, title: candidate.trim().to_owned(), ..HeadingNode::default() };
-                while !stack.is_empty()
-                    && stack.last().is_some_and(|n| n.level >= level)
-                {
+                let heading = HeadingNode {
+                    level,
+                    title: candidate.trim().to_owned(),
+                    ..HeadingNode::default()
+                };
+                while !stack.is_empty() && stack.last().is_some_and(|n| n.level >= level) {
                     let completed = stack.pop().unwrap();
                     current_node(&mut stack, &mut root).children.push(completed);
                 }
@@ -242,10 +229,9 @@ fn parse_rst(content: &str) -> ParsedDoc {
         // Don't set in_code = false here — we're done; avoid an unused-assignment lint.
         let code_content = std::mem::take(&mut code_buf);
         if !code_content.trim().is_empty() {
-            current_node(&mut stack, &mut root).blocks.push(ContentBlock::Code {
-                lang: code_lang,
-                content: code_content,
-            });
+            current_node(&mut stack, &mut root)
+                .blocks
+                .push(ContentBlock::Code { lang: code_lang, content: code_content });
         }
     } else {
         flush_paragraph!();

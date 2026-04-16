@@ -6,12 +6,12 @@ use std::path::Path;
 
 use lore_build::{
     ChunkConfig, ContentBlock, HeadingNode, MarkdownParser, ParsedDoc, ParserRegistry,
-    StructuralChunker, TokenCounter, build_contextual_text,
-    detect_primary_heading_level, discover_files, parser::Parser,
+    StructuralChunker, TokenCounter, build_contextual_text, detect_primary_heading_level,
+    discover_files, parser::Parser,
 };
 use lore_core::NodeKind;
-use tempfile::tempdir;
 use std::fs;
+use tempfile::tempdir;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -23,7 +23,12 @@ fn chunker() -> StructuralChunker {
     StructuralChunker::new(ChunkConfig::default(), counter())
 }
 
-fn heading(level: u8, title: &str, blocks: Vec<ContentBlock>, children: Vec<HeadingNode>) -> HeadingNode {
+fn heading(
+    level: u8,
+    title: &str,
+    blocks: Vec<ContentBlock>,
+    children: Vec<HeadingNode>,
+) -> HeadingNode {
     HeadingNode { level, title: title.into(), blocks, children }
 }
 
@@ -31,12 +36,8 @@ fn para(s: &str) -> ContentBlock {
     ContentBlock::Paragraph(s.into())
 }
 
-
 fn doc(title: &str, children: Vec<HeadingNode>) -> ParsedDoc {
-    ParsedDoc {
-        title: Some(title.into()),
-        root: HeadingNode { children, ..HeadingNode::root() },
-    }
+    ParsedDoc { title: Some(title.into()), root: HeadingNode { children, ..HeadingNode::root() } }
 }
 
 // ── Token counter ─────────────────────────────────────────────────────────────
@@ -102,10 +103,8 @@ Set the environment variable `MY_LIB_PORT=8080`.
     let tree = chunker().chunk(&doc, "lib.md", primary);
 
     // Should have prose and code chunks.
-    let prose: Vec<_> =
-        tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::Chunk).collect();
-    let code: Vec<_> =
-        tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::CodeBlock).collect();
+    let prose: Vec<_> = tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::Chunk).collect();
+    let code: Vec<_> = tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::CodeBlock).collect();
 
     assert!(!prose.is_empty(), "expected at least one prose chunk");
     assert!(!code.is_empty(), "expected at least one code chunk");
@@ -175,10 +174,7 @@ fn test_chunk_registry_end_to_end() {
         let path = Path::new(name);
         let parsed = registry.parse(path, content).expect(name);
         let tree = chunker().chunk(&parsed, name, 2);
-        assert!(
-            !tree.nodes.is_empty(),
-            "expected at least one chunk for {name}"
-        );
+        assert!(!tree.nodes.is_empty(), "expected at least one chunk for {name}");
     }
 }
 

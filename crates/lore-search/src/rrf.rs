@@ -19,7 +19,7 @@ const K: f64 = 60.0;
 #[must_use]
 pub fn merge(lists: &[Vec<ScoredNode>]) -> Vec<ScoredNode> {
     let mut scores: HashMap<i64, f64> = HashMap::new();
-    let mut nodes: HashMap<i64, Node>  = HashMap::new();
+    let mut nodes: HashMap<i64, Node> = HashMap::new();
 
     for list in lists {
         for (rank, scored) in list.iter().enumerate() {
@@ -51,15 +51,15 @@ mod tests {
     fn fake_node(id: i64) -> Node {
         Node {
             id,
-            parent_id:   None,
-            path:        id.to_string(),
-            doc_id:      1,
-            kind:        NodeKind::Chunk,
-            level:       None,
-            title:       None,
-            content:     Some(format!("content {id}")),
+            parent_id: None,
+            path: id.to_string(),
+            doc_id: 1,
+            kind: NodeKind::Chunk,
+            level: None,
+            title: None,
+            content: Some(format!("content {id}")),
             token_count: 10,
-            lang:        None,
+            lang: None,
         }
     }
 

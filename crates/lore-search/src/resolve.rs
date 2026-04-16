@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use lore_core::{Db, LoreError, SearchResult, ScoredNode};
+use lore_core::{Db, LoreError, ScoredNode, SearchResult};
 
 /// Resolves `nodes` into [`SearchResult`]s.
 ///
@@ -17,7 +17,7 @@ pub async fn resolve(db: &Db, nodes: Vec<ScoredNode>) -> Result<Vec<SearchResult
     }
 
     let node_ids: Vec<i64> = nodes.iter().map(|n| n.node.id).collect();
-    let doc_ids:  Vec<i64> = {
+    let doc_ids: Vec<i64> = {
         let mut seen = std::collections::HashSet::new();
         nodes.iter().filter_map(|n| seen.insert(n.node.doc_id).then_some(n.node.doc_id)).collect()
     };
@@ -35,10 +35,7 @@ pub async fn resolve(db: &Db, nodes: Vec<ScoredNode>) -> Result<Vec<SearchResult
             .and_then(|d| d.title.clone())
             .or_else(|| doc.map(|d| d.path.clone()))
             .unwrap_or_default();
-        let heading_path = path_map
-            .get(&scored.node.id)
-            .cloned()
-            .unwrap_or_default();
+        let heading_path = path_map.get(&scored.node.id).cloned().unwrap_or_default();
 
         let doc_path = doc.map(|d| d.path.clone()).unwrap_or_default();
         results.push(SearchResult {

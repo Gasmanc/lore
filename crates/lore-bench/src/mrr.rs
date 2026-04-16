@@ -19,11 +19,7 @@ pub fn compute(reciprocal_ranks: &[f64]) -> f64 {
 /// `expected_doc`.  Returns `1/rank` (1-indexed) or `0.0` if not found
 /// within the first `cutoff` results.
 #[allow(clippy::cast_precision_loss)]
-pub fn reciprocal_rank<T: AsRef<str>>(
-    results: &[T],
-    expected_doc: &str,
-    cutoff: usize,
-) -> f64 {
+pub fn reciprocal_rank<T: AsRef<str>>(results: &[T], expected_doc: &str, cutoff: usize) -> f64 {
     results
         .iter()
         .take(cutoff)

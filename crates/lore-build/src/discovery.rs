@@ -78,9 +78,7 @@ pub fn discover_files(root: &Path, exclude_examples: bool) -> Result<Vec<PathBuf
 
     for result in walker {
         let entry = result.map_err(|e| {
-            let io = e
-                .into_io_error()
-                .unwrap_or_else(|| std::io::Error::other("walkdir error"));
+            let io = e.into_io_error().unwrap_or_else(|| std::io::Error::other("walkdir error"));
             LoreError::Io(io)
         })?;
 

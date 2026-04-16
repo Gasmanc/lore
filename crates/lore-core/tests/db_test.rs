@@ -27,10 +27,7 @@ async fn test_open_and_migrate_succeeds() {
 #[tokio::test]
 async fn test_schema_version_is_set() {
     let db = open_db().await;
-    let version = db
-        .get_meta("schema_version".to_owned())
-        .await
-        .expect("get_meta failed");
+    let version = db.get_meta("schema_version".to_owned()).await.expect("get_meta failed");
 
     let v: u32 = version
         .expect("schema_version key missing")
@@ -53,10 +50,7 @@ async fn test_node_embeddings_table_exists() {
     // Inserting a dummy zero-vector confirms vec0 is available.
     let zeros: Vec<f32> = vec![0.0_f32; 384];
     // We need a real node to insert an embedding for.
-    let doc_id = db
-        .insert_doc("dummy.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("dummy.md".to_owned(), None).await.expect("insert_doc failed");
 
     let node_id = db
         .insert_node(NewNode {
@@ -83,10 +77,7 @@ async fn test_node_embeddings_table_exists() {
         .expect("embedding should be present");
 
     assert_eq!(retrieved.len(), 384, "embedding dimension mismatch");
-    assert!(
-        retrieved.iter().all(|&v| v == 0.0_f32),
-        "embedding values should all be zero"
-    );
+    assert!(retrieved.iter().all(|&v| v == 0.0_f32), "embedding values should all be zero");
 }
 
 // ---------------------------------------------------------------------------
@@ -96,14 +87,9 @@ async fn test_node_embeddings_table_exists() {
 #[tokio::test]
 async fn test_set_and_get_meta_roundtrip() {
     let db = open_db().await;
-    db.set_meta("name".to_owned(), "next".to_owned())
-        .await
-        .expect("set_meta failed");
+    db.set_meta("name".to_owned(), "next".to_owned()).await.expect("set_meta failed");
 
-    let value = db
-        .get_meta("name".to_owned())
-        .await
-        .expect("get_meta failed");
+    let value = db.get_meta("name".to_owned()).await.expect("get_meta failed");
 
     assert_eq!(value.as_deref(), Some("next"));
 }
@@ -111,27 +97,17 @@ async fn test_set_and_get_meta_roundtrip() {
 #[tokio::test]
 async fn test_get_meta_missing_key_returns_none() {
     let db = open_db().await;
-    let value = db
-        .get_meta("nonexistent".to_owned())
-        .await
-        .expect("get_meta failed");
+    let value = db.get_meta("nonexistent".to_owned()).await.expect("get_meta failed");
     assert!(value.is_none());
 }
 
 #[tokio::test]
 async fn test_set_meta_overwrites_existing_value() {
     let db = open_db().await;
-    db.set_meta("key".to_owned(), "first".to_owned())
-        .await
-        .expect("set_meta failed");
-    db.set_meta("key".to_owned(), "second".to_owned())
-        .await
-        .expect("set_meta overwrite failed");
+    db.set_meta("key".to_owned(), "first".to_owned()).await.expect("set_meta failed");
+    db.set_meta("key".to_owned(), "second".to_owned()).await.expect("set_meta overwrite failed");
 
-    let value = db
-        .get_meta("key".to_owned())
-        .await
-        .expect("get_meta failed");
+    let value = db.get_meta("key".to_owned()).await.expect("get_meta failed");
     assert_eq!(value.as_deref(), Some("second"));
 }
 
@@ -152,14 +128,8 @@ async fn test_insert_doc_returns_id() {
 #[tokio::test]
 async fn test_insert_doc_idempotent() {
     let db = open_db().await;
-    let id1 = db
-        .insert_doc("docs/intro.md".to_owned(), None)
-        .await
-        .expect("first insert failed");
-    let id2 = db
-        .insert_doc("docs/intro.md".to_owned(), None)
-        .await
-        .expect("second insert failed");
+    let id1 = db.insert_doc("docs/intro.md".to_owned(), None).await.expect("first insert failed");
+    let id2 = db.insert_doc("docs/intro.md".to_owned(), None).await.expect("second insert failed");
     assert_eq!(id1, id2, "inserting the same path twice should return the same id");
 }
 
@@ -184,10 +154,8 @@ async fn test_get_doc_retrieves_inserted_record() {
 #[tokio::test]
 async fn test_insert_and_get_heading_node() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/caching.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id =
+        db.insert_doc("docs/caching.md".to_owned(), None).await.expect("insert_doc failed");
 
     let node_id = db
         .insert_node(NewNode {
@@ -214,10 +182,7 @@ async fn test_insert_and_get_heading_node() {
 #[tokio::test]
 async fn test_insert_and_get_chunk_node() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/api.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("docs/api.md".to_owned(), None).await.expect("insert_doc failed");
 
     let id = db
         .insert_node(NewNode {
@@ -242,10 +207,8 @@ async fn test_insert_and_get_chunk_node() {
 #[tokio::test]
 async fn test_insert_and_get_code_block_node() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/examples.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id =
+        db.insert_doc("docs/examples.md".to_owned(), None).await.expect("insert_doc failed");
 
     let id = db
         .insert_node(NewNode {
@@ -273,10 +236,7 @@ async fn test_insert_and_get_code_block_node() {
 #[tokio::test]
 async fn test_root_node_path_is_its_own_id() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/root.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("docs/root.md".to_owned(), None).await.expect("insert_doc failed");
 
     let root_id = db
         .insert_node(NewNode {
@@ -299,10 +259,8 @@ async fn test_root_node_path_is_its_own_id() {
 #[tokio::test]
 async fn test_child_node_path_extends_parent_path() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/hierarchy.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id =
+        db.insert_doc("docs/hierarchy.md".to_owned(), None).await.expect("insert_doc failed");
 
     let parent_id = db
         .insert_node(NewNode {
@@ -343,10 +301,7 @@ async fn test_child_node_path_extends_parent_path() {
 #[tokio::test]
 async fn test_three_level_path_enumeration() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/deep.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("docs/deep.md".to_owned(), None).await.expect("insert_doc failed");
 
     let l1 = db
         .insert_node(NewNode {
@@ -401,10 +356,8 @@ async fn test_three_level_path_enumeration() {
 #[tokio::test]
 async fn test_get_children_returns_direct_children_only() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/children.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id =
+        db.insert_doc("docs/children.md".to_owned(), None).await.expect("insert_doc failed");
 
     let root = db
         .insert_node(NewNode {
@@ -473,10 +426,8 @@ async fn test_get_children_returns_direct_children_only() {
 #[tokio::test]
 async fn test_get_ancestors_returns_correct_chain() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/ancestors.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id =
+        db.insert_doc("docs/ancestors.md".to_owned(), None).await.expect("insert_doc failed");
 
     let l1 = db
         .insert_node(NewNode {
@@ -529,10 +480,8 @@ async fn test_get_ancestors_returns_correct_chain() {
 #[tokio::test]
 async fn test_root_node_has_no_ancestors() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/root_only.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id =
+        db.insert_doc("docs/root_only.md".to_owned(), None).await.expect("insert_doc failed");
 
     let root = db
         .insert_node(NewNode {
@@ -559,10 +508,8 @@ async fn test_root_node_has_no_ancestors() {
 #[tokio::test]
 async fn test_get_heading_path_returns_heading_titles_only() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/headings.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id =
+        db.insert_doc("docs/headings.md".to_owned(), None).await.expect("insert_doc failed");
 
     let h1 = db
         .insert_node(NewNode {
@@ -606,10 +553,7 @@ async fn test_get_heading_path_returns_heading_titles_only() {
         .await
         .expect("insert chunk failed");
 
-    let path = db
-        .get_heading_path(chunk)
-        .await
-        .expect("get_heading_path failed");
+    let path = db.get_heading_path(chunk).await.expect("get_heading_path failed");
 
     assert_eq!(path, vec!["Next.js Docs", "Caching"]);
 }
@@ -617,10 +561,7 @@ async fn test_get_heading_path_returns_heading_titles_only() {
 #[tokio::test]
 async fn test_get_heading_path_skips_non_heading_ancestors() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/mixed.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("docs/mixed.md".to_owned(), None).await.expect("insert_doc failed");
 
     let heading = db
         .insert_node(NewNode {
@@ -665,10 +606,7 @@ async fn test_get_heading_path_skips_non_heading_ancestors() {
         .await
         .expect("insert leaf failed");
 
-    let path = db
-        .get_heading_path(leaf)
-        .await
-        .expect("get_heading_path failed");
+    let path = db.get_heading_path(leaf).await.expect("get_heading_path failed");
 
     // Only the Heading ancestor contributes to the breadcrumb.
     assert_eq!(path, vec!["Overview"]);
@@ -681,10 +619,7 @@ async fn test_get_heading_path_skips_non_heading_ancestors() {
 #[tokio::test]
 async fn test_insert_and_retrieve_embedding_roundtrip() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("embed_test.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("embed_test.md".to_owned(), None).await.expect("insert_doc failed");
 
     let node_id = db
         .insert_node(NewNode {
@@ -701,9 +636,7 @@ async fn test_insert_and_retrieve_embedding_roundtrip() {
         .expect("insert_node failed");
 
     let original: Vec<f32> = (0..384).map(|i| i as f32 * 0.001_f32).collect();
-    db.insert_embedding(node_id, original.clone())
-        .await
-        .expect("insert_embedding failed");
+    db.insert_embedding(node_id, original.clone()).await.expect("insert_embedding failed");
 
     let retrieved = db
         .get_embedding(node_id)
@@ -713,20 +646,15 @@ async fn test_insert_and_retrieve_embedding_roundtrip() {
 
     assert_eq!(retrieved.len(), original.len());
     for (a, b) in original.iter().zip(retrieved.iter()) {
-        assert!(
-            (a - b).abs() < f32::EPSILON,
-            "embedding value mismatch: {a} vs {b}"
-        );
+        assert!((a - b).abs() < f32::EPSILON, "embedding value mismatch: {a} vs {b}");
     }
 }
 
 #[tokio::test]
 async fn test_get_embedding_absent_node_returns_none() {
     let db = open_db().await;
-    let result = db
-        .get_embedding(999_999)
-        .await
-        .expect("get_embedding should not error for missing node");
+    let result =
+        db.get_embedding(999_999).await.expect("get_embedding should not error for missing node");
     assert!(result.is_none());
 }
 
@@ -737,21 +665,12 @@ async fn test_get_embedding_absent_node_returns_none() {
 #[tokio::test]
 async fn test_get_package_meta_returns_correct_fields() {
     let db = open_db().await;
-    db.set_meta("name".to_owned(), "next".to_owned())
+    db.set_meta("name".to_owned(), "next".to_owned()).await.expect("set name failed");
+    db.set_meta("registry".to_owned(), "npm".to_owned()).await.expect("set registry failed");
+    db.set_meta("version".to_owned(), "15.0.0".to_owned()).await.expect("set version failed");
+    db.set_meta("description".to_owned(), "The React Framework".to_owned())
         .await
-        .expect("set name failed");
-    db.set_meta("registry".to_owned(), "npm".to_owned())
-        .await
-        .expect("set registry failed");
-    db.set_meta("version".to_owned(), "15.0.0".to_owned())
-        .await
-        .expect("set version failed");
-    db.set_meta(
-        "description".to_owned(),
-        "The React Framework".to_owned(),
-    )
-    .await
-    .expect("set description failed");
+        .expect("set description failed");
 
     let pkg = db.get_package_meta().await.expect("get_package_meta failed");
     assert_eq!(pkg.name, "next");
@@ -766,9 +685,7 @@ async fn test_get_package_meta_returns_correct_fields() {
 async fn test_get_package_meta_fails_without_required_keys() {
     let db = open_db().await;
     // Only set `name`; `registry` and `version` are missing.
-    db.set_meta("name".to_owned(), "orphan".to_owned())
-        .await
-        .expect("set_meta failed");
+    db.set_meta("name".to_owned(), "orphan".to_owned()).await.expect("set_meta failed");
 
     let result = db.get_package_meta().await;
     assert!(
@@ -784,10 +701,7 @@ async fn test_get_package_meta_fails_without_required_keys() {
 #[tokio::test]
 async fn test_delete_nodes_for_doc_with_hierarchy() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("docs/delete.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("docs/delete.md".to_owned(), None).await.expect("insert_doc failed");
 
     let h1 = db
         .insert_node(NewNode {
@@ -817,9 +731,7 @@ async fn test_delete_nodes_for_doc_with_hierarchy() {
     .expect("insert child failed");
 
     // Deleting nodes for the doc should succeed even with the H1 -> Chunk hierarchy.
-    db.delete_nodes_for_doc(doc_id)
-        .await
-        .expect("delete_nodes_for_doc failed with hierarchy");
+    db.delete_nodes_for_doc(doc_id).await.expect("delete_nodes_for_doc failed with hierarchy");
 
     let nodes = db.get_nodes_for_doc(doc_id).await.expect("get_nodes failed");
     assert!(nodes.is_empty(), "nodes should be gone");
@@ -847,10 +759,7 @@ fn test_node_kind_try_from_invalid_returns_error() {
 #[tokio::test]
 async fn test_savepoint_rollback_discards_changes() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("sp_rollback.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("sp_rollback.md".to_owned(), None).await.expect("insert_doc failed");
 
     // Begin savepoint, insert a node, then roll back.
     db.begin_savepoint("reindex".to_owned()).await.expect("begin_savepoint failed");
@@ -882,10 +791,7 @@ async fn test_savepoint_rollback_discards_changes() {
 #[tokio::test]
 async fn test_savepoint_release_persists_changes() {
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("sp_release.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("sp_release.md".to_owned(), None).await.expect("insert_doc failed");
 
     // Begin savepoint, insert a node, then release (commit).
     db.begin_savepoint("reindex".to_owned()).await.expect("begin_savepoint failed");
@@ -917,10 +823,7 @@ async fn test_savepoint_rollback_preserves_prior_data() {
     // Simulates a failed re-index: good nodes exist, a new (bad) write is rolled
     // back, and the original nodes remain intact.
     let db = open_db().await;
-    let doc_id = db
-        .insert_doc("sp_preserve.md".to_owned(), None)
-        .await
-        .expect("insert_doc failed");
+    let doc_id = db.insert_doc("sp_preserve.md".to_owned(), None).await.expect("insert_doc failed");
 
     // Insert a "good" node that represents the previously-indexed state.
     let good_node_id = db

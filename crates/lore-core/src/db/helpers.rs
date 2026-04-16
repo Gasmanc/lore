@@ -16,19 +16,13 @@ use super::NODE_COLUMNS;
 ///
 /// For path `"1/4/9/23"` this returns `[1, 4, 9]`.
 pub(super) fn ancestor_ids_from_path(path: &str, self_id: i64) -> Vec<i64> {
-    path.split('/')
-        .filter_map(|s| s.parse::<i64>().ok())
-        .filter(|&id| id != self_id)
-        .collect()
+    path.split('/').filter_map(|s| s.parse::<i64>().ok()).filter(|&id| id != self_id).collect()
 }
 
 /// Builds a comma-separated placeholder string `?1, ?2, …, ?N` for use in
 /// `WHERE id IN (…)` queries.
 pub(super) fn placeholders_for(ids: &[i64]) -> String {
-    (1..=ids.len())
-        .map(|i| format!("?{i}"))
-        .collect::<Vec<_>>()
-        .join(", ")
+    (1..=ids.len()).map(|i| format!("?{i}")).collect::<Vec<_>>().join(", ")
 }
 
 // ---------------------------------------------------------------------------
@@ -44,10 +38,7 @@ pub(super) fn fetch_nodes_by_ids(
     if ids.is_empty() {
         return Ok(vec![]);
     }
-    let sql = format!(
-        "SELECT {NODE_COLUMNS} FROM nodes WHERE id IN ({})",
-        placeholders_for(ids),
-    );
+    let sql = format!("SELECT {NODE_COLUMNS} FROM nodes WHERE id IN ({})", placeholders_for(ids),);
     let mut stmt = db.prepare(&sql)?;
     let mut nodes: Vec<Node> = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), node_from_row)?
@@ -87,16 +78,16 @@ pub(super) fn node_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Node> {
         )
     })?;
     Ok(Node {
-        id:          row.get(0)?,
-        parent_id:   row.get(1)?,
-        path:        row.get(2)?,
-        doc_id:      row.get(3)?,
+        id: row.get(0)?,
+        parent_id: row.get(1)?,
+        path: row.get(2)?,
+        doc_id: row.get(3)?,
         kind,
-        level:       row.get(5)?,
-        title:       row.get(6)?,
-        content:     row.get(7)?,
+        level: row.get(5)?,
+        title: row.get(6)?,
+        content: row.get(7)?,
         token_count: row.get::<_, u32>(8)?,
-        lang:        row.get(9)?,
+        lang: row.get(9)?,
     })
 }
 

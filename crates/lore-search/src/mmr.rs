@@ -22,8 +22,8 @@ use lore_core::{ScoredNode, cosine_similarity};
 pub fn select<'e>(
     candidates: Vec<ScoredNode>,
     embeddings: &'e HashMap<i64, Vec<f32>>,
-    lambda:     f64,
-    limit:      usize,
+    lambda: f64,
+    limit: usize,
 ) -> Vec<ScoredNode> {
     let n = limit.min(candidates.len());
     if n == 0 {
@@ -31,24 +31,21 @@ pub fn select<'e>(
     }
 
     // Normalise relevance scores to [0, 1].
-    let max_score = candidates
-        .first()
-        .map_or(1.0, |c| c.score)
-        .max(f64::EPSILON);
+    let max_score = candidates.first().map_or(1.0, |c| c.score).max(f64::EPSILON);
 
     let mut remaining = candidates;
     let mut selected: Vec<ScoredNode> = Vec::with_capacity(n);
     // Borrow slices from `embeddings` — avoids cloning on every iteration.
-    let mut sel_embs: Vec<&'e [f32]>  = Vec::with_capacity(n);
+    let mut sel_embs: Vec<&'e [f32]> = Vec::with_capacity(n);
 
     while selected.len() < n && !remaining.is_empty() {
         let best_idx = remaining
             .iter()
             .enumerate()
             .map(|(i, c)| {
-                let rel     = c.score / max_score;
+                let rel = c.score / max_score;
                 let max_sim = max_sim_to_selected(c.node.id, embeddings, &sel_embs);
-                let mmr     = lambda.mul_add(rel, -(1.0 - lambda) * max_sim);
+                let mmr = lambda.mul_add(rel, -(1.0 - lambda) * max_sim);
                 (i, mmr)
             })
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
@@ -67,9 +64,9 @@ pub fn select<'e>(
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 fn max_sim_to_selected(
-    node_id:    i64,
+    node_id: i64,
     embeddings: &HashMap<i64, Vec<f32>>,
-    sel_embs:   &[&[f32]],
+    sel_embs: &[&[f32]],
 ) -> f64 {
     if sel_embs.is_empty() {
         return 0.0;
@@ -77,10 +74,7 @@ fn max_sim_to_selected(
     let Some(emb) = embeddings.get(&node_id) else {
         return 0.0;
     };
-    sel_embs
-        .iter()
-        .map(|s| f64::from(cosine_similarity(emb, s)))
-        .fold(f64::NEG_INFINITY, f64::max)
+    sel_embs.iter().map(|s| f64::from(cosine_similarity(emb, s))).fold(f64::NEG_INFINITY, f64::max)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -93,15 +87,15 @@ mod tests {
     fn fake_node(id: i64) -> Node {
         Node {
             id,
-            parent_id:   None,
-            path:        id.to_string(),
-            doc_id:      1,
-            kind:        NodeKind::Chunk,
-            level:       None,
-            title:       None,
-            content:     Some(format!("content {id}")),
+            parent_id: None,
+            path: id.to_string(),
+            doc_id: 1,
+            kind: NodeKind::Chunk,
+            level: None,
+            title: None,
+            content: Some(format!("content {id}")),
             token_count: 20,
-            lang:        None,
+            lang: None,
         }
     }
 

@@ -73,11 +73,7 @@ impl RawChunk {
     /// double newlines.  Used for token counting and embedding.
     #[must_use]
     pub fn text(&self) -> String {
-        self.blocks
-            .iter()
-            .map(ContentBlock::text)
-            .collect::<Vec<_>>()
-            .join("\n\n")
+        self.blocks.iter().map(ContentBlock::text).collect::<Vec<_>>().join("\n\n")
     }
 }
 

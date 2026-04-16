@@ -32,12 +32,7 @@ pub struct SearchConfig {
 
 impl Default for SearchConfig {
     fn default() -> Self {
-        Self {
-            candidate_limit: 20,
-            relevance_threshold: 0.5,
-            token_budget: 2000,
-            mmr_lambda: 0.7,
-        }
+        Self { candidate_limit: 20, relevance_threshold: 0.5, token_budget: 2000, mmr_lambda: 0.7 }
     }
 }
 

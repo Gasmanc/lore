@@ -13,13 +13,7 @@
 //! The embedding model (~130 MB) is downloaded on first run and cached.
 //! Subsequent runs reuse the cache and complete in under 30 seconds.
 
-#![warn(
-    clippy::all,
-    clippy::pedantic,
-    clippy::nursery,
-    missing_docs,
-    rust_2018_idioms
-)]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
 #![allow(clippy::missing_errors_doc)]
 
 mod corpus;
@@ -34,9 +28,7 @@ const MRR_CUTOFF: usize = 10;
 
 #[tokio::main]
 async fn main() -> Result<(), LoreError> {
-    tracing_subscriber::fmt()
-        .with_env_filter("warn")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("warn").init();
 
     let cache_dir = lore_mcp::model_cache_dir();
 
@@ -53,7 +45,7 @@ async fn main() -> Result<(), LoreError> {
 
     let work_dir = tempdir().map_err(LoreError::Io)?;
     let src_path = work_dir.path().join("src");
-    let db_path  = work_dir.path().join("bench.db");
+    let db_path = work_dir.path().join("bench.db");
     std::fs::create_dir(&src_path).map_err(LoreError::Io)?;
 
     for (filename, content) in corpus::DOCS {
@@ -61,20 +53,19 @@ async fn main() -> Result<(), LoreError> {
     }
 
     let package = Package {
-        name:        "bench-corpus".to_owned(),
-        registry:    "bench".to_owned(),
-        version:     "1.0.0".to_owned(),
+        name: "bench-corpus".to_owned(),
+        registry: "bench".to_owned(),
+        version: "1.0.0".to_owned(),
         description: None,
-        source_url:  None,
-        git_sha:     None,
+        source_url: None,
+        git_sha: None,
     };
 
     // PackageBuilder::new loads the embedding model; we reuse its Embedder for
     // query embedding so the model is only loaded once.
-    let builder =
-        tokio::task::spawn_blocking(move || PackageBuilder::new(&cache_dir))
-            .await
-            .map_err(|e| LoreError::InvalidConfig(e.to_string()))??;
+    let builder = tokio::task::spawn_blocking(move || PackageBuilder::new(&cache_dir))
+        .await
+        .map_err(|e| LoreError::InvalidConfig(e.to_string()))??;
 
     let stats = builder.build(&src_path, package, &db_path, false).await?;
     println!("  {}\n", stats.summary());
@@ -87,20 +78,17 @@ async fn main() -> Result<(), LoreError> {
     let embedder = builder.embedder().clone();
 
     let config = SearchConfig {
-        candidate_limit:     20,
+        candidate_limit: 20,
         // Permissive threshold: keeps weak matches visible so rank can be measured.
         relevance_threshold: 0.05,
         // No token budget — we rank by position, not total tokens.
-        token_budget:        u32::MAX,
-        mmr_lambda:          0.7,
+        token_budget: u32::MAX,
+        mmr_lambda: 0.7,
     };
 
     // ── Embed all queries in one batch ────────────────────────────────────────
 
-    let query_strings: Vec<String> = corpus::QUERIES
-        .iter()
-        .map(|(q, _)| (*q).to_owned())
-        .collect();
+    let query_strings: Vec<String> = corpus::QUERIES.iter().map(|(q, _)| (*q).to_owned()).collect();
 
     let embeddings = tokio::task::spawn_blocking({
         let embedder = embedder.clone();
@@ -134,8 +122,8 @@ async fn main() -> Result<(), LoreError> {
     let mrr_score = mrr::compute(&reciprocal_ranks);
     let n = reciprocal_ranks.len();
     let count_at = |min_rr: f64| reciprocal_ranks.iter().filter(|&&r| r >= min_rr).count();
-    let hit1  = count_at(1.0);
-    let hit3  = count_at(1.0 / 3.0);
+    let hit1 = count_at(1.0);
+    let hit3 = count_at(1.0 / 3.0);
     #[allow(clippy::cast_precision_loss)]
     let hit10 = count_at(1.0 / MRR_CUTOFF as f64);
 
