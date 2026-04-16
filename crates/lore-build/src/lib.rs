@@ -26,7 +26,7 @@ pub mod discovery;
 pub mod embedder;
 /// File indexing pipeline: parse → chunk → embed → write to `Db`.
 pub mod indexer;
-/// Manifest generation — writes a JSON sidecar alongside the built `.db` file.
+/// Manifest generation — JSON sidecar and in-DB API surface manifest.
 pub mod manifest;
 /// Document parser trait and format-specific implementations.
 pub mod parser;
@@ -40,7 +40,7 @@ pub use chunker::{ChunkConfig, ChunkTree, RawChunk, SemanticRefiner, StructuralC
 pub use discovery::discover_files;
 pub use embedder::{EMBEDDING_DIMS, Embedder, build_contextual_text};
 pub use indexer::{FileStats, Indexer};
-pub use manifest::write_manifest;
+pub use manifest::{generate_api_manifest, write_manifest};
 pub use parser::{
     AsciidocParser, ContentBlock, HeadingNode, HtmlParser, MarkdownParser, ParsedDoc,
     ParserRegistry, RstParser, detect_primary_heading_level,

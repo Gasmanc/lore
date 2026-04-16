@@ -1,0 +1,12 @@
+name: astro
+registry: npm
+version: "5.7.3"
+description: "The web framework for content-driven websites"
+source_url: "https://github.com/withastro/astro"
+source:
+  type: git
+  url: "https://github.com/withastro/docs"
+  branch: "main"
+  subdir: src/content/docs/en
+build:
+  exclude_examples: true

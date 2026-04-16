@@ -1,0 +1,12 @@
+name: hono
+registry: npm
+version: "4.7.5"
+description: "Fast, lightweight web framework for the Edges"
+source_url: "https://github.com/honojs/hono"
+source:
+  type: git
+  url: "https://github.com/honojs/website"
+  branch: "main"
+  subdir: docs
+build:
+  exclude_examples: false
