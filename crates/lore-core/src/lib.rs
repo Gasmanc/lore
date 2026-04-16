@@ -12,13 +12,7 @@
 //! * **Database access** — [`db::Db`], an async wrapper around a `SQLite`
 //!   database with schema migrations, CRUD operations, and FTS5/vector helpers.
 
-#![warn(
-    clippy::all,
-    clippy::pedantic,
-    clippy::nursery,
-    missing_docs,
-    rust_2018_idioms
-)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
 // `clippy::pedantic` flags some intentional patterns; suppress selectively.
 #![allow(
     clippy::module_name_repetitions, // e.g. `LoreError` in `error` module
@@ -28,12 +22,12 @@
 
 /// Async database connection, schema management, and CRUD operations.
 pub mod db;
-/// Floating-point math utilities shared by the build and search pipelines.
-pub mod math;
 /// The [`Doc`] type representing a documentation file.
 pub mod doc;
 /// The [`LoreError`] type used throughout the workspace.
 pub mod error;
+/// Floating-point math utilities shared by the build and search pipelines.
+pub mod math;
 /// [`Node`], [`NewNode`], and [`NodeKind`] — the fundamental unit of indexed content.
 pub mod node;
 /// [`Package`] and [`PackageMetadata`] — package identity and registry data.
@@ -45,7 +39,7 @@ pub mod search;
 pub use db::Db;
 pub use doc::Doc;
 pub use error::LoreError;
+pub use math::cosine_similarity;
 pub use node::{NewNode, Node, NodeKind};
 pub use package::{Package, PackageMetadata};
-pub use math::cosine_similarity;
-pub use search::{SearchConfig, SearchResult, ScoredNode};
+pub use search::{ScoredNode, SearchConfig, SearchResult};

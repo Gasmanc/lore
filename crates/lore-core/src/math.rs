@@ -11,7 +11,7 @@
 #[must_use]
 pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     debug_assert_eq!(a.len(), b.len(), "cosine_similarity: slice lengths must match");
-    let dot:    f32 = a.iter().zip(b).map(|(&x, &y)| x * y).sum();
+    let dot: f32 = a.iter().zip(b).map(|(&x, &y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|&x| x * x).sum::<f32>().sqrt();
     let norm_b: f32 = b.iter().map(|&x| x * x).sum::<f32>().sqrt();
     if norm_a == 0.0 || norm_b == 0.0 {

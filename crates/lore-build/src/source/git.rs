@@ -17,6 +17,7 @@ pub struct GitSource {
 
 impl GitSource {
     /// Create a [`GitSource`] for the given repository URL.
+    #[must_use]
     pub fn new(url: impl Into<String>) -> Self {
         Self { url: url.into(), branch: None }
     }

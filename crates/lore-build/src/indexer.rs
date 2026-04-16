@@ -53,11 +53,11 @@ impl FileStats {
 /// Construct once per build run and reuse across all files — each component
 /// (tokeniser, model, …) is initialised exactly once.
 pub struct Indexer {
-    parsers:  ParserRegistry,
-    chunker:  StructuralChunker,
-    refiner:  SemanticRefiner,
+    parsers: ParserRegistry,
+    chunker: StructuralChunker,
+    refiner: SemanticRefiner,
     embedder: Embedder,
-    db:       Db,
+    db: Db,
 }
 
 impl Indexer {
@@ -68,11 +68,11 @@ impl Indexer {
     /// instances directly.
     #[must_use]
     pub const fn new(
-        parsers:  ParserRegistry,
-        chunker:  StructuralChunker,
-        refiner:  SemanticRefiner,
+        parsers: ParserRegistry,
+        chunker: StructuralChunker,
+        refiner: SemanticRefiner,
         embedder: Embedder,
-        db:       Db,
+        db: Db,
     ) -> Self {
         Self { parsers, chunker, refiner, embedder, db }
     }
@@ -99,7 +99,7 @@ impl Indexer {
     #[instrument(skip(self, content), fields(path = %path.as_ref().display()))]
     pub async fn index_file(
         &self,
-        path:    impl AsRef<Path>,
+        path: impl AsRef<Path>,
         content: &str,
     ) -> Result<Option<FileStats>, LoreError> {
         let path = path.as_ref();
@@ -141,10 +141,10 @@ impl Indexer {
     /// wrapper in the outer function can catch any error and roll back cleanly.
     async fn index_file_inner(
         &self,
-        path:     &Path,
+        path: &Path,
         path_str: String,
-        doc:      ParsedDoc,
-        refined:  ChunkTree,
+        doc: ParsedDoc,
+        refined: ChunkTree,
     ) -> Result<Option<FileStats>, LoreError> {
         // Ensure the doc record exists and purge any previously indexed nodes
         // so rebuilds are idempotent.  This must happen *before* the empty
@@ -166,7 +166,12 @@ impl Indexer {
 
         for (chunk, _) in refined.iter() {
             let parent_id = self
-                .ensure_heading_chain(&chunk.heading_path, &chunk.heading_levels, doc_id, &mut heading_cache)
+                .ensure_heading_chain(
+                    &chunk.heading_path,
+                    &chunk.heading_levels,
+                    doc_id,
+                    &mut heading_cache,
+                )
                 .await?;
 
             let node_id = self.insert_chunk(chunk, doc_id, parent_id).await?;
@@ -184,8 +189,13 @@ impl Indexer {
         // `heading_cache`, so headings already created by chunk processing above
         // are not duplicated.
         for fh in &refined.folded_headings {
-            self.ensure_heading_chain(fh.heading_path(), fh.heading_levels(), doc_id, &mut heading_cache)
-                .await?;
+            self.ensure_heading_chain(
+                fh.heading_path(),
+                fh.heading_levels(),
+                doc_id,
+                &mut heading_cache,
+            )
+            .await?;
         }
 
         // Pass 2: batch-embed all texts in one blocking call, then persist.
@@ -242,10 +252,10 @@ impl Indexer {
     /// re-inserted.
     async fn ensure_heading_chain(
         &self,
-        heading_path:   &[String],
+        heading_path: &[String],
         heading_levels: &[u8],
-        doc_id:         i64,
-        cache:          &mut HashMap<Vec<String>, i64>,
+        doc_id: i64,
+        cache: &mut HashMap<Vec<String>, i64>,
     ) -> Result<Option<i64>, LoreError> {
         debug_assert_eq!(
             heading_path.len(),
@@ -271,10 +281,7 @@ impl Indexer {
             // depth (which is correct for headings created before heading_levels
             // was populated).
             #[allow(clippy::cast_possible_truncation)]
-            let level = heading_levels
-                .get(depth - 1)
-                .copied()
-                .unwrap_or(depth as u8);
+            let level = heading_levels.get(depth - 1).copied().unwrap_or(depth as u8);
             let title = heading_path[depth - 1].clone();
 
             let node_id = self
@@ -282,12 +289,12 @@ impl Indexer {
                 .insert_node(NewNode {
                     parent_id,
                     doc_id,
-                    kind:        NodeKind::Heading,
-                    level:       Some(level),
-                    title:       Some(title),
-                    content:     None,
+                    kind: NodeKind::Heading,
+                    level: Some(level),
+                    title: Some(title),
+                    content: None,
                     token_count: 0,
-                    lang:        None,
+                    lang: None,
                 })
                 .await?;
 
@@ -301,8 +308,8 @@ impl Indexer {
     /// Inserts a single [`RawChunk`] as a `Chunk` or `CodeBlock` node.
     async fn insert_chunk(
         &self,
-        chunk:     &RawChunk,
-        doc_id:    i64,
+        chunk: &RawChunk,
+        doc_id: i64,
         parent_id: Option<i64>,
     ) -> Result<i64, LoreError> {
         let (content, lang) = chunk.content_and_lang();
@@ -310,10 +317,10 @@ impl Indexer {
             .insert_node(NewNode {
                 parent_id,
                 doc_id,
-                kind:        chunk.kind,
-                level:       None,
-                title:       None,
-                content:     Some(content),
+                kind: chunk.kind,
+                level: None,
+                title: None,
+                content: Some(content),
                 token_count: chunk.token_count,
                 lang,
             })
@@ -360,17 +367,11 @@ mod tests {
     use std::sync::LazyLock;
 
     use super::*;
-    use crate::{
-        chunker::ChunkConfig,
-        embedder::Embedder,
-        tokens::TokenCounter,
-    };
+    use crate::{chunker::ChunkConfig, embedder::Embedder, tokens::TokenCounter};
 
     static EMBEDDER: LazyLock<Embedder> = LazyLock::new(|| {
-        let cache = dirs_next::cache_dir()
-            .unwrap_or_else(std::env::temp_dir)
-            .join("lore")
-            .join("models");
+        let cache =
+            dirs_next::cache_dir().unwrap_or_else(std::env::temp_dir).join("lore").join("models");
         Embedder::new(&cache).expect("embedder must init")
     });
 
@@ -405,11 +406,9 @@ mod tests {
         let db = Db::open_in_memory().await.expect("db open");
         let indexer = make_indexer(db.clone());
 
-        let md = "## Usage\n\nHere is an example:\n\n```rust\nfn main() { println!(\"hi\"); }\n```\n";
-        indexer
-            .index_file(Path::new("code.md"), md)
-            .await
-            .expect("index should succeed");
+        let md =
+            "## Usage\n\nHere is an example:\n\n```rust\nfn main() { println!(\"hi\"); }\n```\n";
+        indexer.index_file(Path::new("code.md"), md).await.expect("index should succeed");
 
         // Verify the code-block node exists and has an embedding.
         let code_node = {
@@ -435,10 +434,7 @@ mod tests {
         let db = Db::open_in_memory().await.expect("db open");
         let indexer = make_indexer(db.clone());
         // A file with no real content should not error.
-        indexer
-            .index_file(Path::new("empty.md"), "")
-            .await
-            .expect("empty file must not error");
+        indexer.index_file(Path::new("empty.md"), "").await.expect("empty file must not error");
     }
 
     #[tokio::test]
@@ -450,17 +446,11 @@ mod tests {
         let indexer = make_indexer(db.clone());
 
         let md = "## Guide\n\nIntro paragraph.\n\n### Setup\n\nInstall instructions.\n";
-        indexer
-            .index_file(Path::new("fold.md"), md)
-            .await
-            .expect("index should succeed");
+        indexer.index_file(Path::new("fold.md"), md).await.expect("index should succeed");
 
         // Collect all heading nodes for the doc.
         let nodes = db.get_nodes_for_doc(1).await.expect("get nodes");
-        let headings: Vec<_> = nodes
-            .iter()
-            .filter(|n| n.kind == NodeKind::Heading)
-            .collect();
+        let headings: Vec<_> = nodes.iter().filter(|n| n.kind == NodeKind::Heading).collect();
 
         // Both H2 "Guide" and H3 "Setup" must exist as heading nodes.
         assert_eq!(headings.len(), 2, "expected both H2 and folded H3 heading nodes");
@@ -480,19 +470,13 @@ mod tests {
 
         // First build: file with content.
         let md = "## Section\n\nContent here.\n";
-        indexer
-            .index_file(Path::new("doc.md"), md)
-            .await
-            .expect("first index");
+        indexer.index_file(Path::new("doc.md"), md).await.expect("first index");
 
         let nodes_before = db.get_nodes_for_doc(1).await.expect("get nodes");
         assert!(!nodes_before.is_empty(), "should have nodes after first build");
 
         // Second build: same path, now empty.
-        indexer
-            .index_file(Path::new("doc.md"), "")
-            .await
-            .expect("second index (empty)");
+        indexer.index_file(Path::new("doc.md"), "").await.expect("second index (empty)");
 
         let nodes_after = db.get_nodes_for_doc(1).await.expect("get nodes");
         assert!(nodes_after.is_empty(), "stale nodes should be purged on empty rebuild");

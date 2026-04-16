@@ -32,6 +32,7 @@ pub struct WebsiteSource {
 
 impl WebsiteSource {
     /// Create a [`WebsiteSource`] starting from `root_url`.
+    #[must_use]
     pub fn new(root_url: impl Into<String>) -> Self {
         Self { root_url: root_url.into(), max_pages: DEFAULT_MAX_PAGES }
     }
@@ -161,11 +162,8 @@ fn should_crawl(url: &Url) -> bool {
 fn url_to_path(url: &Url, out_dir: &std::path::Path) -> PathBuf {
     // Use the URL path segments as directory structure.
     let path = url.path().trim_start_matches('/');
-    let stem = if path.is_empty() || path == "/" {
-        "index".to_owned()
-    } else {
-        path.replace('/', "__")
-    };
+    let stem =
+        if path.is_empty() || path == "/" { "index".to_owned() } else { path.replace('/', "__") };
     // Ensure we don't overwrite non-.md files accidentally.
     let stem = if std::path::Path::new(&stem)
         .extension()
@@ -193,9 +191,7 @@ mod tests {
 
     #[test]
     fn canonical_url_strips_fragment_and_query() {
-        let url: Url = "https://docs.example.com/guide?ref=nav#section"
-            .parse()
-            .unwrap();
+        let url: Url = "https://docs.example.com/guide?ref=nav#section".parse().unwrap();
         assert_eq!(canonical_url(&url), "https://docs.example.com/guide");
     }
 

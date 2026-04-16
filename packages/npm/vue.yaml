@@ -1,0 +1,12 @@
+name: vue
+registry: npm
+version: "3.5.13"
+description: "The Progressive JavaScript Framework"
+source_url: "https://github.com/vuejs/vue"
+source:
+  type: git
+  url: "https://github.com/vuejs/docs"
+  branch: "main"
+  subdir: src
+build:
+  exclude_examples: true

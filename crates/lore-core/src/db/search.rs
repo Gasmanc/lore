@@ -4,12 +4,7 @@
 
 use rusqlite::params;
 
-use crate::{
-    doc::Doc,
-    error::LoreError,
-    node::NodeKind,
-    search::ScoredNode,
-};
+use crate::{doc::Doc, error::LoreError, node::NodeKind, search::ScoredNode};
 
 use super::{
     Db, NODE_COLUMNS_ALIASED,

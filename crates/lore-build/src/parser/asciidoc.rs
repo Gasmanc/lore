@@ -16,10 +16,7 @@ pub struct AsciidocParser;
 
 impl Parser for AsciidocParser {
     fn can_parse(&self, path: &Path) -> bool {
-        matches!(
-            path.extension().and_then(|e| e.to_str()),
-            Some("adoc" | "asciidoc")
-        )
+        matches!(path.extension().and_then(|e| e.to_str()), Some("adoc" | "asciidoc"))
     }
 
     fn parse(&self, content: &str, _path: &Path) -> Result<ParsedDoc, LoreError> {
@@ -44,9 +41,7 @@ fn parse_asciidoc(content: &str) -> ParsedDoc {
             let text = paragraph_buf.trim().to_owned();
             paragraph_buf.clear();
             if !text.is_empty() {
-                current_node(&mut stack, &mut root)
-                    .blocks
-                    .push(ContentBlock::Paragraph(text));
+                current_node(&mut stack, &mut root).blocks.push(ContentBlock::Paragraph(text));
             }
         };
     }
@@ -60,10 +55,7 @@ fn parse_asciidoc(content: &str) -> ParsedDoc {
                 if !code_content.trim().is_empty() {
                     current_node(&mut stack, &mut root)
                         .blocks
-                        .push(ContentBlock::Code {
-                            lang: code_lang.take(),
-                            content: code_content,
-                        });
+                        .push(ContentBlock::Code { lang: code_lang.take(), content: code_content });
                 }
             } else {
                 code_buf.push_str(line);
@@ -101,9 +93,7 @@ fn parse_asciidoc(content: &str) -> ParsedDoc {
         if let Some(heading) = parse_heading(line) {
             flush_paragraph!();
             pending_lang = None;
-            while !stack.is_empty()
-                && stack.last().is_some_and(|n| n.level >= heading.level)
-            {
+            while !stack.is_empty() && stack.last().is_some_and(|n| n.level >= heading.level) {
                 let completed = stack.pop().unwrap();
                 current_node(&mut stack, &mut root).children.push(completed);
             }

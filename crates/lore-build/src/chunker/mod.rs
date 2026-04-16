@@ -73,11 +73,7 @@ impl RawChunk {
     /// double newlines.  Used for token counting and embedding.
     #[must_use]
     pub fn text(&self) -> String {
-        self.blocks
-            .iter()
-            .map(ContentBlock::text)
-            .collect::<Vec<_>>()
-            .join("\n\n")
+        self.blocks.iter().map(ContentBlock::text).collect::<Vec<_>>().join("\n\n")
     }
 }
 
@@ -98,6 +94,7 @@ pub struct FoldedHeading {
 impl FoldedHeading {
     /// Creates a new `FoldedHeading`, enforcing the invariant that
     /// `heading_path` and `heading_levels` are the same length.
+    #[must_use]
     pub fn new(heading_path: Vec<String>, heading_levels: Vec<u8>) -> Self {
         debug_assert_eq!(
             heading_path.len(),

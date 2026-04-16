@@ -150,8 +150,7 @@ pub(super) const NODE_COLUMNS: &str =
 
 /// Same as [`NODE_COLUMNS`] but prefixed with `n.` for use in JOIN queries
 /// where multiple tables have columns with the same name (`title`, `content`).
-pub(super) const NODE_COLUMNS_ALIASED: &str =
-    "n.id, n.parent_id, n.path, n.doc_id, n.kind, n.level, n.title, n.content, n.token_count, n.lang";
+pub(super) const NODE_COLUMNS_ALIASED: &str = "n.id, n.parent_id, n.path, n.doc_id, n.kind, n.level, n.title, n.content, n.token_count, n.lang";
 
 // ---------------------------------------------------------------------------
 // Db
@@ -172,18 +171,16 @@ impl Db {
     #[instrument(skip_all, fields(path = %path.as_ref().display()))]
     pub async fn open(path: impl AsRef<Path>) -> Result<Self, LoreError> {
         ensure_vec_extension_registered();
-        let conn = tokio_rusqlite::Connection::open(path.as_ref())
-            .await
-            .map_err(LoreError::Database)?;
+        let conn =
+            tokio_rusqlite::Connection::open(path.as_ref()).await.map_err(LoreError::Database)?;
         Self::init(conn).await
     }
 
     /// Opens an in-memory database.  Useful for tests.
     pub async fn open_in_memory() -> Result<Self, LoreError> {
         ensure_vec_extension_registered();
-        let conn = tokio_rusqlite::Connection::open_in_memory()
-            .await
-            .map_err(LoreError::Database)?;
+        let conn =
+            tokio_rusqlite::Connection::open_in_memory().await.map_err(LoreError::Database)?;
         Self::init(conn).await
     }
 
