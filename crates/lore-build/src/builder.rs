@@ -16,6 +16,7 @@ use crate::{
     discovery::discover_files,
     embedder::Embedder,
     indexer::Indexer,
+    manifest::generate_api_manifest,
     parser::ParserRegistry,
     tokens::TokenCounter,
 };
@@ -80,7 +81,7 @@ impl BuildStats {
 /// ```
 pub struct PackageBuilder {
     embedder: Embedder,
-    config:   ChunkConfig,
+    config: ChunkConfig,
 }
 
 impl PackageBuilder {
@@ -115,9 +116,9 @@ impl PackageBuilder {
     #[instrument(skip(self, meta), fields(source = %source_dir.display(), output = %output_path.display()))]
     pub async fn build(
         &self,
-        source_dir:       &Path,
-        meta:             Package,
-        output_path:      &Path,
+        source_dir: &Path,
+        meta: Package,
+        output_path: &Path,
         exclude_examples: bool,
     ) -> Result<BuildStats, LoreError> {
         let start = Instant::now();
@@ -151,6 +152,12 @@ impl PackageBuilder {
         // Rebuild FTS5 index after all nodes are inserted (bulk rebuild is
         // faster than incremental triggers for a one-shot build).
         db.rebuild_fts().await?;
+
+        // Generate and store the compressed API surface manifest.
+        match generate_api_manifest(&db).await {
+            Ok(_) => {}
+            Err(e) => warn!(error = %e, "manifest generation failed (non-fatal)"),
+        }
 
         // Compact and tune the database.
         db.optimize().await?;
@@ -192,24 +199,21 @@ impl PackageBuilder {
     /// Reads a file, runs the indexer, and updates build stats.
     async fn index_one(
         &self,
-        indexer:    &Indexer,
-        file_path:  &PathBuf,
+        indexer: &Indexer,
+        file_path: &PathBuf,
         source_dir: &Path,
-        stats:      &mut BuildStats,
+        stats: &mut BuildStats,
     ) -> Result<(), LoreError> {
         let content = std::fs::read_to_string(file_path).map_err(LoreError::Io)?;
 
         // Store a relative path so the package is portable.
-        let rel_path = file_path
-            .strip_prefix(source_dir)
-            .unwrap_or(file_path)
-            .to_string_lossy()
-            .into_owned();
+        let rel_path =
+            file_path.strip_prefix(source_dir).unwrap_or(file_path).to_string_lossy().into_owned();
 
         if let Some(file_stats) = indexer.index_file(&rel_path, &content).await? {
-            stats.chunk_count       += file_stats.chunk_count;
-            stats.code_block_count  += file_stats.code_block_count;
-            stats.total_tokens      += file_stats.total_tokens;
+            stats.chunk_count += file_stats.chunk_count;
+            stats.code_block_count += file_stats.code_block_count;
+            stats.total_tokens += file_stats.total_tokens;
         }
 
         Ok(())

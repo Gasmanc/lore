@@ -16,10 +16,7 @@ pub struct HtmlParser;
 
 impl Parser for HtmlParser {
     fn can_parse(&self, path: &Path) -> bool {
-        matches!(
-            path.extension().and_then(|e| e.to_str()),
-            Some("html" | "htm")
-        )
+        matches!(path.extension().and_then(|e| e.to_str()), Some("html" | "htm"))
     }
 
     fn parse(&self, content: &str, path: &Path) -> Result<ParsedDoc, LoreError> {
@@ -63,9 +60,7 @@ fn extract_title(document: &Html) -> Option<String> {
     }
     // Fall back to first <h1>.
     let h1_sel = Selector::parse("h1").unwrap();
-    document.select(&h1_sel).next().map(|el| {
-        el.text().collect::<String>().trim().to_owned()
-    })
+    document.select(&h1_sel).next().map(|el| el.text().collect::<String>().trim().to_owned())
 }
 
 /// Remove boilerplate tags by rebuilding the HTML without them.
@@ -162,8 +157,8 @@ fn find_close_tag(html: &str, tag: &str) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use super::*;
+    use std::path::Path;
 
     fn parse(html: &str) -> ParsedDoc {
         HtmlParser.parse(html, Path::new("test.html")).unwrap()

@@ -1,0 +1,14 @@
+[package]
+name    = "lore-integration-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dev-dependencies]
+lore-core    = { path = "../../crates/lore-core" }
+lore-build   = { path = "../../crates/lore-build" }
+lore-search  = { path = "../../crates/lore-search" }
+tokio        = { workspace = true }
+tempfile     = { workspace = true }
+serde_yaml   = { workspace = true }
+dirs-next    = { workspace = true }

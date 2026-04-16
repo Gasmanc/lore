@@ -16,6 +16,7 @@ pub struct LocalSource {
 
 impl LocalSource {
     /// Create a `LocalSource` pointing at `dir`.
+    #[must_use]
     pub fn new(dir: impl Into<PathBuf>) -> Self {
         Self { dir: dir.into() }
     }

@@ -67,9 +67,7 @@ impl Embedder {
             .embed(vec![text], None)
             .map_err(|e| LoreError::Embed(format!("embedding failed: {e}")))?;
 
-        results
-            .pop()
-            .ok_or_else(|| LoreError::Embed("embedder returned empty results".into()))
+        results.pop().ok_or_else(|| LoreError::Embed("embedder returned empty results".into()))
     }
 
     /// Embed a batch of texts.  Processes up to [`BATCH_SIZE`] texts per call.
@@ -141,11 +139,7 @@ pub fn build_contextual_text(heading_path: &[String], content: &str) -> String {
 fn model_is_cached(cache_dir: &Path) -> bool {
     // fastembed uses the model's string ID as the subdirectory name.
     // BGESmallENV15 resolves to "fast-bge-small-en-v1.5".
-    let candidates = [
-        "fast-bge-small-en-v1.5",
-        "bge-small-en-v1.5",
-        "BAAI/bge-small-en-v1.5",
-    ];
+    let candidates = ["fast-bge-small-en-v1.5", "bge-small-en-v1.5", "BAAI/bge-small-en-v1.5"];
     candidates.iter().any(|name| cache_dir.join(name).exists())
 }
 
@@ -160,10 +154,8 @@ mod tests {
     /// Shared embedder — initialised at most once per test binary execution.
     /// Prevents file-system races when tests run on multiple threads.
     static EMBEDDER: LazyLock<Embedder> = LazyLock::new(|| {
-        let cache = dirs_next::cache_dir()
-            .unwrap_or_else(std::env::temp_dir)
-            .join("lore")
-            .join("models");
+        let cache =
+            dirs_next::cache_dir().unwrap_or_else(std::env::temp_dir).join("lore").join("models");
         Embedder::new(&cache).expect("embedder must initialise")
     });
 

@@ -77,8 +77,7 @@ impl HeadingNode {
     /// Total number of content blocks in this node and all descendants.
     #[must_use]
     pub fn total_block_count(&self) -> usize {
-        self.blocks.len()
-            + self.children.iter().map(Self::total_block_count).sum::<usize>()
+        self.blocks.len() + self.children.iter().map(Self::total_block_count).sum::<usize>()
     }
 }
 
@@ -146,12 +145,7 @@ impl ParserRegistry {
             .parsers
             .iter()
             .find(|p| p.can_parse(path))
-            .ok_or_else(|| {
-                LoreError::Parse(format!(
-                    "no parser for {}",
-                    path.display()
-                ))
-            })?;
+            .ok_or_else(|| LoreError::Parse(format!("no parser for {}", path.display())))?;
         parser.parse(content, path)
     }
 }

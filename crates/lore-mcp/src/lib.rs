@@ -11,18 +11,8 @@
 //!
 //! Call [`serve_stdio`] from `main`; it blocks until the client disconnects.
 
-#![warn(
-    clippy::all,
-    clippy::pedantic,
-    clippy::nursery,
-    missing_docs,
-    rust_2018_idioms
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::missing_errors_doc,
-    clippy::must_use_candidate
-)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
+#![allow(clippy::module_name_repetitions, clippy::missing_errors_doc, clippy::must_use_candidate)]
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -83,17 +73,15 @@ pub struct LoreServer {
 impl LoreServer {
     /// Construct a new [`LoreServer`].
     fn new_inner(packages_dir: PathBuf, embedder: Embedder) -> Self {
-        Self {
-            packages_dir,
-            embedder: Arc::new(embedder),
-            tool_router: Self::tool_router(),
-        }
+        Self { packages_dir, embedder: Arc::new(embedder), tool_router: Self::tool_router() }
     }
 
     // ── Tools ──────────────────────────────────────────────────────────────────
 
     /// Search indexed documentation using hybrid semantic + keyword retrieval.
-    #[tool(description = "Search indexed documentation for a package using hybrid semantic + keyword retrieval. Returns ranked excerpts with heading paths and relevance scores.")]
+    #[tool(
+        description = "Search indexed documentation for a package using hybrid semantic + keyword retrieval. Returns ranked excerpts with heading paths and relevance scores."
+    )]
     async fn search_docs(
         &self,
         Parameters(p): Parameters<SearchParams>,
@@ -133,47 +121,45 @@ impl LoreServer {
             .iter()
             .map(|(key, meta)| {
                 let desc = meta.description.as_deref().unwrap_or("");
-                if desc.is_empty() {
-                    format!("- {key}")
-                } else {
-                    format!("- {key}: {desc}")
-                }
+                if desc.is_empty() { format!("- {key}") } else { format!("- {key}: {desc}") }
             })
             .collect();
         Ok(lines.join("\n"))
     }
 
-    /// Return metadata for a specific installed package.
-    #[tool(description = "Return metadata (name, version, description, source URL) for a specific installed package.")]
+    /// Return the compressed API surface manifest for an installed package.
+    ///
+    /// The manifest is a `~500 token` index of the package's public API,
+    /// suitable for pasting into `CLAUDE.md` as a fingerpost.
+    #[tool(
+        description = "Return the compressed API surface manifest for an installed package (~500 tokens). Contains heading paths and API signatures suitable for pasting into CLAUDE.md."
+    )]
     async fn get_manifest(
         &self,
         Parameters(p): Parameters<GetManifestParams>,
     ) -> Result<String, rmcp::Error> {
         let db = self.open_db(&p.package).await?;
-        let meta = db
-            .get_package_meta()
+        let manifest = db
+            .get_meta("manifest".to_owned())
             .await
             .map_err(|e| rmcp::Error::internal_error(e.to_string(), None))?;
 
-        let mut lines = vec![
-            format!("name: {}", meta.name),
-            format!("registry: {}", meta.registry),
-            format!("version: {}", meta.version),
-        ];
-        if let Some(desc) = &meta.description {
-            lines.push(format!("description: {desc}"));
+        match manifest {
+            Some(m) if !m.is_empty() => Ok(m),
+            _ => Err(rmcp::Error::invalid_params(
+                format!(
+                    "package '{pkg}' has no manifest — rebuild with `lore build`",
+                    pkg = p.package
+                ),
+                None,
+            )),
         }
-        if let Some(url) = &meta.source_url {
-            lines.push(format!("source_url: {url}"));
-        }
-        if let Some(sha) = &meta.git_sha {
-            lines.push(format!("git_sha: {sha}"));
-        }
-        Ok(lines.join("\n"))
     }
 
     /// Retrieve the full content of a specific node by its numeric id.
-    #[tool(description = "Retrieve the full content of a specific documentation node by its numeric id (as returned by search_docs).")]
+    #[tool(
+        description = "Retrieve the full content of a specific documentation node by its numeric id (as returned by search_docs)."
+    )]
     async fn get_node(
         &self,
         Parameters(p): Parameters<GetNodeParams>,
@@ -217,8 +203,7 @@ pub async fn serve_stdio(packages_dir: PathBuf) -> Result<(), LoreError> {
     // Model loading (~130 MB) is CPU-bound and must not block the async reactor.
     let embedder = tokio::task::spawn_blocking(move || Embedder::new(&cache))
         .await
-        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))?
-        ?;
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
     let server = LoreServer::new_inner(packages_dir, embedder);
 
     rmcp::ServiceExt::serve(server, rmcp::transport::io::stdio())
@@ -245,10 +230,7 @@ impl LoreServer {
 
 /// Returns the shared embedding model cache directory.
 pub fn model_cache_dir() -> PathBuf {
-    dirs_next::cache_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join("lore")
-        .join("models")
+    dirs_next::cache_dir().unwrap_or_else(std::env::temp_dir).join("lore").join("models")
 }
 
 /// Scan `packages_dir` for `*.db` files and return `(key, Package)` pairs.
@@ -279,11 +261,7 @@ pub async fn scan_packages(
     let mut join_set = tokio::task::JoinSet::new();
     for path in paths {
         join_set.spawn(async move {
-            let key = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_owned();
+            let key = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_owned();
             let db = Db::open(&path).await.ok()?;
             let meta = db.get_package_meta().await.ok()?;
             Some((key, meta))

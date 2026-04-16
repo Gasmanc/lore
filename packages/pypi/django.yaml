@@ -1,0 +1,12 @@
+name: django
+registry: pypi
+version: "5.2"
+description: "The web framework for perfectionists with deadlines"
+source_url: "https://github.com/django/django"
+source:
+  type: git
+  url: "https://github.com/django/django"
+  branch: "stable/5.2.x"
+  subdir: docs
+build:
+  exclude_examples: true

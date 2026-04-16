@@ -10,11 +10,7 @@ use lore_core::NodeKind;
 // Re-export so embedder tests can import `crate::chunker::semantic::cosine_similarity`.
 pub use lore_core::cosine_similarity;
 
-use crate::{
-    embedder::Embedder,
-    parser::ContentBlock,
-    tokens::TokenCounter,
-};
+use crate::{embedder::Embedder, parser::ContentBlock, tokens::TokenCounter};
 
 use super::{ChunkConfig, RawChunk};
 
@@ -71,15 +67,12 @@ impl SemanticRefiner {
 
         // Embed each paragraph (without breadcrumb — these are fragments,
         // not final chunks).
-        let embeddings = embedder.embed_batch(
-            &paragraphs.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>(),
-        )?;
+        let embeddings = embedder
+            .embed_batch(&paragraphs.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>())?;
 
         // Compute cosine similarity between consecutive paragraph embeddings.
-        let similarities: Vec<f32> = embeddings
-            .windows(2)
-            .map(|w| cosine_similarity(&w[0], &w[1]))
-            .collect();
+        let similarities: Vec<f32> =
+            embeddings.windows(2).map(|w| cosine_similarity(&w[0], &w[1])).collect();
 
         // Find split positions using the valley detection heuristic.
         let split_positions = valley_positions(&similarities);
@@ -111,8 +104,7 @@ fn valley_positions(similarities: &[f32]) -> Vec<usize> {
     #[allow(clippy::cast_precision_loss)] // n never exceeds a few hundred
     let n = similarities.len() as f32;
     let mean: f32 = similarities.iter().sum::<f32>() / n;
-    let variance: f32 =
-        similarities.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / n;
+    let variance: f32 = similarities.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / n;
     let std_dev = variance.sqrt();
 
     let threshold = std_dev.mul_add(-1.0, mean);
@@ -239,18 +231,14 @@ mod tests {
 
     /// Shared embedder — initialised at most once per test binary execution.
     static EMBEDDER: LazyLock<Embedder> = LazyLock::new(|| {
-        let cache = dirs_next::cache_dir()
-            .unwrap_or_else(std::env::temp_dir)
-            .join("lore")
-            .join("models");
+        let cache =
+            dirs_next::cache_dir().unwrap_or_else(std::env::temp_dir).join("lore").join("models");
         Embedder::new(&cache).expect("embedder must init")
     });
 
     fn prose_chunk(paragraphs: &[&str]) -> RawChunk {
-        let blocks = paragraphs
-            .iter()
-            .map(|p| ContentBlock::Paragraph((*p).to_owned()))
-            .collect::<Vec<_>>();
+        let blocks =
+            paragraphs.iter().map(|p| ContentBlock::Paragraph((*p).to_owned())).collect::<Vec<_>>();
         let text = paragraphs.join("\n\n");
         // Build a counter just for token counting in the test helper.
         let counter = TokenCounter::new().unwrap();

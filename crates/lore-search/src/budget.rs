@@ -38,15 +38,15 @@ mod tests {
         ScoredNode {
             node: Node {
                 id,
-                parent_id:   None,
-                path:        id.to_string(),
-                doc_id:      1,
-                kind:        NodeKind::Chunk,
-                level:       None,
-                title:       None,
-                content:     None,
+                parent_id: None,
+                path: id.to_string(),
+                doc_id: 1,
+                kind: NodeKind::Chunk,
+                level: None,
+                title: None,
+                content: None,
                 token_count,
-                lang:        None,
+                lang: None,
             },
             score: 1.0,
         }
@@ -54,11 +54,8 @@ mod tests {
 
     #[test]
     fn budget_limits_results() {
-        let nodes = vec![
-            node_with_tokens(1, 100),
-            node_with_tokens(2, 100),
-            node_with_tokens(3, 100),
-        ];
+        let nodes =
+            vec![node_with_tokens(1, 100), node_with_tokens(2, 100), node_with_tokens(3, 100)];
         let result = apply(nodes, 250);
         assert_eq!(result.len(), 2);
     }
@@ -73,11 +70,7 @@ mod tests {
 
     #[test]
     fn budget_allows_all_when_under_limit() {
-        let nodes = vec![
-            node_with_tokens(1, 50),
-            node_with_tokens(2, 50),
-            node_with_tokens(3, 50),
-        ];
+        let nodes = vec![node_with_tokens(1, 50), node_with_tokens(2, 50), node_with_tokens(3, 50)];
         let result = apply(nodes, 200);
         assert_eq!(result.len(), 3);
     }
