@@ -32,6 +32,7 @@ pub struct WebsiteSource {
 
 impl WebsiteSource {
     /// Create a [`WebsiteSource`] starting from `root_url`.
+    #[must_use]
     pub fn new(root_url: impl Into<String>) -> Self {
         Self { root_url: root_url.into(), max_pages: DEFAULT_MAX_PAGES }
     }
