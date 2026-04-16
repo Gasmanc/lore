@@ -1,9 +1,8 @@
 //! Integration tests for the lore-build parser module.
 
 use lore_build::{
-    AsciidocParser, ContentBlock, HeadingNode, MarkdownParser,
-    ParserRegistry, RstParser, detect_primary_heading_level,
-    parser::Parser,
+    AsciidocParser, ContentBlock, HeadingNode, MarkdownParser, ParserRegistry, RstParser,
+    detect_primary_heading_level, parser::Parser,
 };
 use std::path::Path;
 
@@ -16,11 +15,8 @@ fn api_reference_tree() -> HeadingNode {
     // One H2 module heading with lots of H3 function entries.
     let mut module = HeadingNode { level: 2, title: "Module".into(), ..HeadingNode::default() };
     for i in 0..8 {
-        let mut func = HeadingNode {
-            level: 3,
-            title: format!("function_{i}"),
-            ..HeadingNode::default()
-        };
+        let mut func =
+            HeadingNode { level: 3, title: format!("function_{i}"), ..HeadingNode::default() };
         func.blocks.push(ContentBlock::Paragraph("Description.".into()));
         func.blocks.push(ContentBlock::Code {
             lang: Some("rust".into()),
@@ -36,11 +32,8 @@ fn api_reference_tree() -> HeadingNode {
 fn tutorial_tree() -> HeadingNode {
     let mut root = HeadingNode::root();
     for i in 0..4 {
-        let mut section = HeadingNode {
-            level: 2,
-            title: format!("Chapter {i}"),
-            ..HeadingNode::default()
-        };
+        let mut section =
+            HeadingNode { level: 2, title: format!("Chapter {i}"), ..HeadingNode::default() };
         // Each H2 has multiple content blocks.
         section.blocks.push(ContentBlock::Paragraph("Introduction text.".into()));
         section.blocks.push(ContentBlock::Paragraph("More details here.".into()));
@@ -86,18 +79,14 @@ fn test_registry_selects_markdown() {
 #[test]
 fn test_registry_selects_rst() {
     let registry = ParserRegistry::new();
-    let doc = registry
-        .parse(Path::new("docs.rst"), "Hello\n=====\n\nContent.\n")
-        .unwrap();
+    let doc = registry.parse(Path::new("docs.rst"), "Hello\n=====\n\nContent.\n").unwrap();
     assert!(!doc.root.children.is_empty());
 }
 
 #[test]
 fn test_registry_selects_adoc() {
     let registry = ParserRegistry::new();
-    let doc = registry
-        .parse(Path::new("guide.adoc"), "== Overview\n\nContent.\n")
-        .unwrap();
+    let doc = registry.parse(Path::new("guide.adoc"), "== Overview\n\nContent.\n").unwrap();
     assert!(!doc.root.children.is_empty());
 }
 

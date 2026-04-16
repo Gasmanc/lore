@@ -13,21 +13,11 @@
 //! The `display_key` is `"{registry}-{name}@{version}"`, matching
 //! [`lore_core::Package::display_key`].
 
-#![warn(
-    clippy::all,
-    clippy::pedantic,
-    clippy::nursery,
-    missing_docs,
-    rust_2018_idioms
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::missing_errors_doc,
-    clippy::must_use_candidate
-)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
+#![allow(clippy::module_name_repetitions, clippy::missing_errors_doc, clippy::must_use_candidate)]
 
 pub mod spec;
-pub use spec::{BuildOptions, PackageSpec, SourceSpec, load_spec, load_all_specs};
+pub use spec::{BuildOptions, PackageSpec, SourceSpec, load_all_specs, load_spec};
 
 use std::path::Path;
 
@@ -138,17 +128,13 @@ impl RegistryClient {
         }
 
         let tmp_path = target_path.with_extension("db.tmp");
-        let file = tokio::fs::File::create(&tmp_path)
-            .await
-            .map_err(LoreError::Io)?;
+        let file = tokio::fs::File::create(&tmp_path).await.map_err(LoreError::Io)?;
         let mut file = tokio::io::BufWriter::new(file);
 
         let mut stream = resp.bytes_stream();
         while let Some(chunk) = stream.next().await {
             let bytes = chunk.map_err(|e| LoreError::Registry(e.to_string()))?;
-            tokio::io::AsyncWriteExt::write_all(&mut file, &bytes)
-                .await
-                .map_err(LoreError::Io)?;
+            tokio::io::AsyncWriteExt::write_all(&mut file, &bytes).await.map_err(LoreError::Io)?;
             if let Some(pb) = progress {
                 #[allow(clippy::cast_possible_truncation)]
                 pb.inc(bytes.len() as u64);
@@ -158,9 +144,7 @@ impl RegistryClient {
         tokio::io::AsyncWriteExt::flush(&mut file).await.map_err(LoreError::Io)?;
 
         // Atomic rename so the target is never half-written.
-        tokio::fs::rename(&tmp_path, target_path)
-            .await
-            .map_err(LoreError::Io)?;
+        tokio::fs::rename(&tmp_path, target_path).await.map_err(LoreError::Io)?;
 
         if let Some(pb) = progress {
             pb.finish_and_clear();

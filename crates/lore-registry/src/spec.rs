@@ -152,7 +152,9 @@ source:
     fn parse_git_spec() {
         let spec: PackageSpec = serde_yaml::from_str(GIT_YAML).unwrap();
         assert_eq!(spec.name, "next");
-        assert!(matches!(spec.source, SourceSpec::Git { ref branch, .. } if branch.as_deref() == Some("v15.0.0")));
+        assert!(
+            matches!(spec.source, SourceSpec::Git { ref branch, .. } if branch.as_deref() == Some("v15.0.0"))
+        );
         assert!(spec.build.exclude_examples);
     }
 

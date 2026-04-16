@@ -13,25 +13,11 @@
 //! 4. **Indexing** — (Phase 5) writes nodes, FTS5 entries, and vector
 //!    embeddings into a [`lore_core::Db`].
 
-#![warn(
-    clippy::all,
-    clippy::pedantic,
-    clippy::nursery,
-    missing_docs,
-    rust_2018_idioms
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::missing_errors_doc,
-    clippy::must_use_candidate
-)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
+#![allow(clippy::module_name_repetitions, clippy::missing_errors_doc, clippy::must_use_candidate)]
 
 /// Package build orchestrator — coordinates the full pipeline.
 pub mod builder;
-/// Manifest generation — writes a JSON sidecar alongside the built `.db` file.
-pub mod manifest;
-/// Pluggable build sources: local directory, git repository, website crawler.
-pub mod source;
 /// Chunking pipeline: structural splitting and semantic refinement.
 pub mod chunker;
 /// File discovery — finds documentation files in a directory tree.
@@ -40,20 +26,24 @@ pub mod discovery;
 pub mod embedder;
 /// File indexing pipeline: parse → chunk → embed → write to `Db`.
 pub mod indexer;
+/// Manifest generation — writes a JSON sidecar alongside the built `.db` file.
+pub mod manifest;
 /// Document parser trait and format-specific implementations.
 pub mod parser;
+/// Pluggable build sources: local directory, git repository, website crawler.
+pub mod source;
 /// Token counting with the `cl100k_base` BPE tokenizer.
 pub mod tokens;
 
 pub use builder::{BuildStats, PackageBuilder};
-pub use manifest::write_manifest;
-pub use source::{GitSource, LocalSource, PreparedSource, Source, WebsiteSource};
 pub use chunker::{ChunkConfig, ChunkTree, RawChunk, SemanticRefiner, StructuralChunker};
 pub use discovery::discover_files;
-pub use embedder::{build_contextual_text, Embedder, EMBEDDING_DIMS};
+pub use embedder::{EMBEDDING_DIMS, Embedder, build_contextual_text};
 pub use indexer::{FileStats, Indexer};
+pub use manifest::write_manifest;
 pub use parser::{
     AsciidocParser, ContentBlock, HeadingNode, HtmlParser, MarkdownParser, ParsedDoc,
     ParserRegistry, RstParser, detect_primary_heading_level,
 };
+pub use source::{GitSource, LocalSource, PreparedSource, Source, WebsiteSource};
 pub use tokens::TokenCounter;

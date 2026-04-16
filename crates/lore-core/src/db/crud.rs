@@ -40,8 +40,7 @@ impl Db {
     pub async fn get_meta(&self, key: String) -> Result<Option<String>, LoreError> {
         self.conn
             .call(move |db| {
-                let mut stmt =
-                    db.prepare_cached("SELECT value FROM meta WHERE key = ?1")?;
+                let mut stmt = db.prepare_cached("SELECT value FROM meta WHERE key = ?1")?;
                 let mut rows = stmt.query(params![key])?;
                 rows.next()?.map(|row| row.get::<_, String>(0)).transpose()
             })
@@ -57,11 +56,7 @@ impl Db {
     ///
     /// If a record with the same `path` already exists the existing `id` is
     /// returned (the title is not updated).
-    pub async fn insert_doc(
-        &self,
-        path: String,
-        title: Option<String>,
-    ) -> Result<i64, LoreError> {
+    pub async fn insert_doc(&self, path: String, title: Option<String>) -> Result<i64, LoreError> {
         self.conn
             .call(move |db| {
                 // INSERT OR IGNORE returns last_insert_rowid() = 0 on conflict,
@@ -71,8 +66,7 @@ impl Db {
                     "INSERT OR IGNORE INTO docs (path, title) VALUES (?1, ?2)",
                     params![path, title],
                 )?;
-                let mut stmt =
-                    db.prepare_cached("SELECT id FROM docs WHERE path = ?1")?;
+                let mut stmt = db.prepare_cached("SELECT id FROM docs WHERE path = ?1")?;
                 stmt.query_row(params![path], |row| row.get(0))
             })
             .await
@@ -83,17 +77,9 @@ impl Db {
     pub async fn get_doc(&self, id: i64) -> Result<Doc, LoreError> {
         self.conn
             .call(move |db| {
-                db.query_row(
-                    "SELECT id, path, title FROM docs WHERE id = ?1",
-                    params![id],
-                    |row| {
-                        Ok(Doc {
-                            id: row.get(0)?,
-                            path: row.get(1)?,
-                            title: row.get(2)?,
-                        })
-                    },
-                )
+                db.query_row("SELECT id, path, title FROM docs WHERE id = ?1", params![id], |row| {
+                    Ok(Doc { id: row.get(0)?, path: row.get(1)?, title: row.get(2)? })
+                })
             })
             .await
             .map_err(LoreError::from)
@@ -107,9 +93,7 @@ impl Db {
                     db.prepare_cached("SELECT id, path, title FROM docs WHERE path = ?1")?;
                 let mut rows = stmt.query(params![path])?;
                 rows.next()?
-                    .map(|row| {
-                        Ok(Doc { id: row.get(0)?, path: row.get(1)?, title: row.get(2)? })
-                    })
+                    .map(|row| Ok(Doc { id: row.get(0)?, path: row.get(1)?, title: row.get(2)? }))
                     .transpose()
             })
             .await
@@ -156,12 +140,8 @@ impl Db {
 
                 // Path is built after insert because it must encode the node's
                 // own id, which is only known after last_insert_rowid().
-                let path = parent_path
-                    .map_or_else(|| id.to_string(), |pp| format!("{pp}/{id}"));
-                db.execute(
-                    "UPDATE nodes SET path = ?1 WHERE id = ?2",
-                    params![path, id],
-                )?;
+                let path = parent_path.map_or_else(|| id.to_string(), |pp| format!("{pp}/{id}"));
+                db.execute("UPDATE nodes SET path = ?1 WHERE id = ?2", params![path, id])?;
 
                 Ok(id)
             })
@@ -171,21 +151,17 @@ impl Db {
 
     /// Returns the [`Node`] with the given `id`.
     pub async fn get_node(&self, id: i64) -> Result<Node, LoreError> {
-        self.conn
-            .call(move |db| node_from_db(db, id))
-            .await
-            .map_err(LoreError::from)
+        self.conn.call(move |db| node_from_db(db, id)).await.map_err(LoreError::from)
     }
 
     /// Returns all direct children of `parent_id`, ordered by `id`.
     pub async fn get_children(&self, parent_id: i64) -> Result<Vec<Node>, LoreError> {
         self.conn
             .call(move |db| {
-                let mut stmt = db.prepare(
-                    &format!("SELECT {NODE_COLUMNS} FROM nodes WHERE parent_id = ?1 ORDER BY id"),
-                )?;
-                stmt.query_map(params![parent_id], node_from_row)?
-                    .collect::<Result<Vec<_>, _>>()
+                let mut stmt = db.prepare(&format!(
+                    "SELECT {NODE_COLUMNS} FROM nodes WHERE parent_id = ?1 ORDER BY id"
+                ))?;
+                stmt.query_map(params![parent_id], node_from_row)?.collect::<Result<Vec<_>, _>>()
             })
             .await
             .map_err(LoreError::from)
@@ -261,8 +237,7 @@ impl Db {
                 let mut stmt = db.prepare(&format!(
                     "SELECT {NODE_COLUMNS} FROM nodes WHERE doc_id = ?1 ORDER BY id"
                 ))?;
-                stmt.query_map(params![doc_id], node_from_row)?
-                    .collect::<Result<Vec<_>, _>>()
+                stmt.query_map(params![doc_id], node_from_row)?.collect::<Result<Vec<_>, _>>()
             })
             .await
             .map_err(LoreError::from)
@@ -299,9 +274,8 @@ impl Db {
     pub async fn get_embedding(&self, node_id: i64) -> Result<Option<Vec<f32>>, LoreError> {
         self.conn
             .call(move |db| {
-                let mut stmt = db.prepare_cached(
-                    "SELECT embedding FROM node_embeddings WHERE rowid = ?1",
-                )?;
+                let mut stmt =
+                    db.prepare_cached("SELECT embedding FROM node_embeddings WHERE rowid = ?1")?;
                 let mut rows = stmt.query(params![node_id])?;
                 rows.next()?
                     .map(|row| -> rusqlite::Result<Vec<f32>> {
@@ -327,22 +301,20 @@ impl Db {
         self.conn
             .call(|db| {
                 let get = |key: &str| -> rusqlite::Result<Option<String>> {
-                    let mut stmt =
-                        db.prepare_cached("SELECT value FROM meta WHERE key = ?1")?;
+                    let mut stmt = db.prepare_cached("SELECT value FROM meta WHERE key = ?1")?;
                     let mut rows = stmt.query(params![key])?;
                     rows.next()?.map(|r| r.get(0)).transpose()
                 };
-                let required = |opt: Option<String>| {
-                    opt.ok_or(rusqlite::Error::QueryReturnedNoRows)
-                };
+                let required =
+                    |opt: Option<String>| opt.ok_or(rusqlite::Error::QueryReturnedNoRows);
 
                 Ok(Package {
-                    name:        required(get("name")?)?,
-                    registry:    required(get("registry")?)?,
-                    version:     required(get("version")?)?,
+                    name: required(get("name")?)?,
+                    registry: required(get("registry")?)?,
+                    version: required(get("version")?)?,
                     description: get("description")?,
-                    source_url:  get("source_url")?,
-                    git_sha:     get("git_sha")?,
+                    source_url: get("source_url")?,
+                    git_sha: get("git_sha")?,
                 })
             })
             .await
@@ -415,9 +387,7 @@ impl Db {
     pub async fn rollback_savepoint(&self, name: String) -> Result<(), LoreError> {
         self.conn
             .call(move |db| {
-                db.execute_batch(&format!(
-                    "ROLLBACK TO SAVEPOINT \"{name}\"; RELEASE \"{name}\""
-                ))
+                db.execute_batch(&format!("ROLLBACK TO SAVEPOINT \"{name}\"; RELEASE \"{name}\""))
             })
             .await
             .map_err(LoreError::from)

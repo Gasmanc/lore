@@ -59,10 +59,7 @@ mod tests {
             and writing low-level code, like device drivers and operating systems.";
         let count = counter().count(text);
         // Rough sanity check: a 100-word paragraph should be 80–130 tokens.
-        assert!(
-            (80..=130).contains(&count),
-            "expected 80–130 tokens for prose, got {count}"
-        );
+        assert!((80..=130).contains(&count), "expected 80–130 tokens for prose, got {count}");
     }
 
     #[test]

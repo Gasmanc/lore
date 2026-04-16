@@ -10,25 +10,15 @@
 //! 6. **Token budget** ([`budget`]) — stop once total tokens would be exceeded.
 //! 7. **Resolve** ([`resolve`]) — attach doc titles and heading breadcrumbs.
 
-#![warn(
-    clippy::all,
-    clippy::pedantic,
-    clippy::nursery,
-    missing_docs,
-    rust_2018_idioms
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::missing_errors_doc,
-    clippy::must_use_candidate
-)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
+#![allow(clippy::module_name_repetitions, clippy::missing_errors_doc, clippy::must_use_candidate)]
 
 mod budget;
 mod mmr;
 mod resolve;
 mod rrf;
 
-pub use lore_core::{SearchConfig, SearchResult, ScoredNode};
+pub use lore_core::{ScoredNode, SearchConfig, SearchResult};
 
 use std::collections::HashMap;
 
@@ -45,10 +35,10 @@ use tracing::instrument;
 /// Returns [`LoreError`] if any database operation fails.
 #[instrument(skip(db, query_embedding, config), fields(query = %query))]
 pub async fn search(
-    db:              &Db,
-    query:           &str,
+    db: &Db,
+    query: &str,
     query_embedding: &[f32],
-    config:          &SearchConfig,
+    config: &SearchConfig,
 ) -> Result<Vec<SearchResult>, LoreError> {
     let limit = config.candidate_limit;
 
@@ -63,17 +53,12 @@ pub async fn search(
     }
 
     let top_score = merged[0].score;
-    let merged: Vec<_> = merged
-        .into_iter()
-        .filter(|n| n.score >= top_score * config.relevance_threshold)
-        .collect();
+    let merged: Vec<_> =
+        merged.into_iter().filter(|n| n.score >= top_score * config.relevance_threshold).collect();
 
     let node_ids: Vec<i64> = merged.iter().map(|n| n.node.id).collect();
-    let embeddings: HashMap<i64, Vec<f32>> = db
-        .get_embeddings_for_nodes(node_ids)
-        .await?
-        .into_iter()
-        .collect();
+    let embeddings: HashMap<i64, Vec<f32>> =
+        db.get_embeddings_for_nodes(node_ids).await?.into_iter().collect();
 
     let selected = mmr::select(merged, &embeddings, config.mmr_lambda, limit);
     let selected = budget::apply(selected, config.token_budget);

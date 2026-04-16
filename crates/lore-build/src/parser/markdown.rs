@@ -26,10 +26,7 @@ pub struct MarkdownParser;
 
 impl Parser for MarkdownParser {
     fn can_parse(&self, path: &Path) -> bool {
-        matches!(
-            path.extension().and_then(|e| e.to_str()),
-            Some("md" | "mdx" | "qmd" | "rmd")
-        )
+        matches!(path.extension().and_then(|e| e.to_str()), Some("md" | "mdx" | "qmd" | "rmd"))
     }
 
     fn parse(&self, content: &str, _path: &Path) -> Result<ParsedDoc, LoreError> {
@@ -60,9 +57,7 @@ fn extract_frontmatter(content: &str) -> (Option<String>, &str) {
     }
 
     let after_open = &content[4..];
-    let close = after_open
-        .find("\n---\n")
-        .or_else(|| after_open.find("\n---\r\n"));
+    let close = after_open.find("\n---\n").or_else(|| after_open.find("\n---\r\n"));
 
     let Some(close_pos) = close else {
         return (None, content);
@@ -162,9 +157,7 @@ fn build_tree(content: &str) -> HeadingNode {
                 let new_node =
                     HeadingNode { level: s.heading_level, title, ..HeadingNode::default() };
                 // Pop stack until we find a proper parent (lower level).
-                while stack.len() > 1
-                    && stack.last().is_some_and(|n| n.level >= s.heading_level)
-                {
+                while stack.len() > 1 && stack.last().is_some_and(|n| n.level >= s.heading_level) {
                     let completed = stack.pop().unwrap();
                     stack.last_mut().unwrap().children.push(completed);
                 }
@@ -199,10 +192,11 @@ fn build_tree(content: &str) -> HeadingNode {
                 s.ctx = Context::None;
                 let content = std::mem::take(&mut s.code_text);
                 if !content.trim().is_empty() {
-                    stack.last_mut().unwrap().blocks.push(ContentBlock::Code {
-                        lang: s.code_lang.take(),
-                        content,
-                    });
+                    stack
+                        .last_mut()
+                        .unwrap()
+                        .blocks
+                        .push(ContentBlock::Code { lang: s.code_lang.take(), content });
                 }
             }
 
@@ -274,8 +268,7 @@ fn strip_jsx(text: &str) -> String {
     while i < len {
         if bytes[i] == b'<' {
             let start = i + 1;
-            let name_start =
-                if start < len && bytes[start] == b'/' { start + 1 } else { start };
+            let name_start = if start < len && bytes[start] == b'/' { start + 1 } else { start };
             if name_start < len && bytes[name_start].is_ascii_uppercase() {
                 if let Some(rel) = bytes[i..].iter().position(|&b| b == b'>') {
                     i += rel + 1;
@@ -372,8 +365,7 @@ mod tests {
 
     #[test]
     fn test_frontmatter() {
-        let md =
-            "---\ntitle: My Great Doc\nauthor: Alice\n---\n\n# Heading\n\nContent.\n";
+        let md = "---\ntitle: My Great Doc\nauthor: Alice\n---\n\n# Heading\n\nContent.\n";
         let doc = parse(md);
         assert_eq!(doc.title.as_deref(), Some("My Great Doc"));
         assert_eq!(doc.root.children.len(), 1);
@@ -397,8 +389,7 @@ mod tests {
 
     #[test]
     fn test_nested_headings() {
-        let md =
-            "## Parent\n\nParent content.\n\n### Child\n\nChild content.\n";
+        let md = "## Parent\n\nParent content.\n\n### Child\n\nChild content.\n";
         let doc = parse(md);
         let h2 = &doc.root.children[0];
         assert_eq!(h2.title, "Parent");

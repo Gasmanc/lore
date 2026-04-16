@@ -115,29 +115,20 @@ fn walk(
         // Record this heading for the indexer to materialise as a DB node,
         // but only if it has a meaningful title.
         if !node.title.trim().is_empty() {
-            tree.folded_headings.push(FoldedHeading::new(
-                path.clone(),
-                levels.clone(),
-            ));
+            tree.folded_headings.push(FoldedHeading::new(path.clone(), levels.clone()));
         }
 
         let (parent_chunk, _) = &mut tree.nodes[parent_idx];
 
         // Inject the folded heading title as inline context.
         if !node.title.trim().is_empty() {
-            parent_chunk
-                .blocks
-                .push(ContentBlock::Paragraph(node.title.clone()));
+            parent_chunk.blocks.push(ContentBlock::Paragraph(node.title.clone()));
         }
         parent_chunk.blocks.extend(prose_blocks);
 
         // Re-count tokens after merge.
-        let text: String = parent_chunk
-            .blocks
-            .iter()
-            .map(ContentBlock::text)
-            .collect::<Vec<_>>()
-            .join("\n\n");
+        let text: String =
+            parent_chunk.blocks.iter().map(ContentBlock::text).collect::<Vec<_>>().join("\n\n");
         parent_chunk.token_count = counter.count(&text);
         parent_chunk.needs_refinement = parent_chunk.token_count > config.soft_max_tokens;
 
@@ -190,7 +181,18 @@ fn walk(
     // Children use the prose chunk of this heading as their parent so they
     // nest correctly in the path enumeration.
     for child in &node.children {
-        walk(child, prose_idx, &path, &levels, doc_path, doc_title, primary_level, tree, counter, config);
+        walk(
+            child,
+            prose_idx,
+            &path,
+            &levels,
+            doc_path,
+            doc_title,
+            primary_level,
+            tree,
+            counter,
+            config,
+        );
     }
 
     prose_idx
@@ -220,7 +222,12 @@ mod tests {
         ContentBlock::Code { lang: Some(lang.into()), content: s.into() }
     }
 
-    fn heading(level: u8, title: &str, blocks: Vec<ContentBlock>, children: Vec<HeadingNode>) -> HeadingNode {
+    fn heading(
+        level: u8,
+        title: &str,
+        blocks: Vec<ContentBlock>,
+        children: Vec<HeadingNode>,
+    ) -> HeadingNode {
         HeadingNode { level, title: title.into(), blocks, children }
     }
 
