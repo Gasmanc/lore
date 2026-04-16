@@ -1,0 +1,12 @@
+name: drizzle-orm
+registry: npm
+version: "0.41.0"
+description: "TypeScript ORM for SQL databases"
+source_url: "https://github.com/drizzle-team/drizzle-orm"
+source:
+  type: git
+  url: "https://github.com/drizzle-team/drizzle-orm-docs"
+  branch: "main"
+  subdir: src/content/docs
+build:
+  exclude_examples: true

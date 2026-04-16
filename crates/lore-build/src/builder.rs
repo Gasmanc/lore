@@ -16,6 +16,7 @@ use crate::{
     discovery::discover_files,
     embedder::Embedder,
     indexer::Indexer,
+    manifest::generate_api_manifest,
     parser::ParserRegistry,
     tokens::TokenCounter,
 };
@@ -151,6 +152,12 @@ impl PackageBuilder {
         // Rebuild FTS5 index after all nodes are inserted (bulk rebuild is
         // faster than incremental triggers for a one-shot build).
         db.rebuild_fts().await?;
+
+        // Generate and store the compressed API surface manifest.
+        match generate_api_manifest(&db).await {
+            Ok(_) => {}
+            Err(e) => warn!(error = %e, "manifest generation failed (non-fatal)"),
+        }
 
         // Compact and tune the database.
         db.optimize().await?;

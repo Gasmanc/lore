@@ -127,35 +127,33 @@ impl LoreServer {
         Ok(lines.join("\n"))
     }
 
-    /// Return metadata for a specific installed package.
+    /// Return the compressed API surface manifest for an installed package.
+    ///
+    /// The manifest is a `~500 token` index of the package's public API,
+    /// suitable for pasting into `CLAUDE.md` as a fingerpost.
     #[tool(
-        description = "Return metadata (name, version, description, source URL) for a specific installed package."
+        description = "Return the compressed API surface manifest for an installed package (~500 tokens). Contains heading paths and API signatures suitable for pasting into CLAUDE.md."
     )]
     async fn get_manifest(
         &self,
         Parameters(p): Parameters<GetManifestParams>,
     ) -> Result<String, rmcp::Error> {
         let db = self.open_db(&p.package).await?;
-        let meta = db
-            .get_package_meta()
+        let manifest = db
+            .get_meta("manifest".to_owned())
             .await
             .map_err(|e| rmcp::Error::internal_error(e.to_string(), None))?;
 
-        let mut lines = vec![
-            format!("name: {}", meta.name),
-            format!("registry: {}", meta.registry),
-            format!("version: {}", meta.version),
-        ];
-        if let Some(desc) = &meta.description {
-            lines.push(format!("description: {desc}"));
+        match manifest {
+            Some(m) if !m.is_empty() => Ok(m),
+            _ => Err(rmcp::Error::invalid_params(
+                format!(
+                    "package '{pkg}' has no manifest — rebuild with `lore build`",
+                    pkg = p.package
+                ),
+                None,
+            )),
         }
-        if let Some(url) = &meta.source_url {
-            lines.push(format!("source_url: {url}"));
-        }
-        if let Some(sha) = &meta.git_sha {
-            lines.push(format!("git_sha: {sha}"));
-        }
-        Ok(lines.join("\n"))
     }
 
     /// Retrieve the full content of a specific node by its numeric id.

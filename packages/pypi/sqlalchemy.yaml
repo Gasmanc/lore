@@ -1,0 +1,12 @@
+name: sqlalchemy
+registry: pypi
+version: "2.0.40"
+description: "The Python SQL Toolkit and Object Relational Mapper"
+source_url: "https://github.com/sqlalchemy/sqlalchemy"
+source:
+  type: git
+  url: "https://github.com/sqlalchemy/sqlalchemy"
+  branch: "rel_2_0_40"
+  subdir: doc/build
+build:
+  exclude_examples: true

@@ -1,12 +1,14 @@
 //! `lore` command-line interface.
 //!
 //! Subcommands:
-//! - `add`    — install a package from the registry
-//! - `remove` — remove an installed package
-//! - `list`   — list installed packages
-//! - `search` — hybrid search across an installed package
-//! - `build`  — build a package from a local source directory
-//! - `mcp`    — start the MCP server on stdin/stdout
+//! - `add`      — install a package from the registry
+//! - `remove`   — remove an installed package
+//! - `list`     — list installed packages
+//! - `search`   — hybrid search across an installed package
+//! - `build`    — build a package from a local source directory
+//! - `manifest` — print the compressed API surface manifest for a package
+//! - `info`     — show detailed metadata and statistics for a package
+//! - `mcp`      — start the MCP server on stdin/stdout
 
 use std::path::PathBuf;
 
@@ -87,6 +89,22 @@ enum Command {
         #[arg(long)]
         exclude_examples: bool,
     },
+    /// Print the compressed API surface manifest for an installed package.
+    ///
+    /// The manifest is a ~500-token index of the package's public API,
+    /// suitable for pasting into CLAUDE.md as a fingerpost.
+    Manifest {
+        /// Package key (e.g. `npm-next@15.0.0`).
+        package: String,
+        /// Copy the manifest to the clipboard (macOS: pbcopy, Linux: xclip/xsel).
+        #[arg(long)]
+        copy: bool,
+    },
+    /// Show detailed metadata and statistics for an installed package.
+    Info {
+        /// Package key (e.g. `npm-next@15.0.0`).
+        package: String,
+    },
     /// Start the MCP server on stdin/stdout (for use by AI coding assistants).
     Mcp,
 }
@@ -126,6 +144,8 @@ async fn main() {
             let meta = Package { name, version, registry, description, source_url, git_sha: None };
             cmd_build(source_dir, meta, output, exclude_examples, &packages_dir).await
         }
+        Command::Manifest { package, copy } => cmd_manifest(package, copy, &packages_dir).await,
+        Command::Info { package } => cmd_info(package, &packages_dir).await,
         Command::Mcp => cmd_mcp(packages_dir).await,
     };
 
@@ -334,12 +354,146 @@ async fn cmd_build(
     Ok(())
 }
 
+/// `lore manifest <package>` — prints the compressed API surface manifest.
+async fn cmd_manifest(
+    package: String,
+    copy: bool,
+    packages_dir: &std::path::Path,
+) -> Result<(), LoreError> {
+    let path = packages_dir.join(format!("{package}.db"));
+    let db = lore_core::Db::open(&path).await.map_err(|_| {
+        LoreError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("package '{package}' is not installed"),
+        ))
+    })?;
+
+    let manifest =
+        db.get_meta("manifest".to_owned()).await?.filter(|m| !m.is_empty()).ok_or_else(|| {
+            LoreError::NotFound(format!(
+                "package '{package}' has no manifest — rebuild with `lore build`"
+            ))
+        })?;
+
+    if copy {
+        // Try pbcopy (macOS), then xclip, then xsel.
+        let copied = try_copy_to_clipboard(&manifest);
+        if copied {
+            println!("{}", manifest);
+            println!("{} Copied to clipboard", style("✓").green().bold());
+        } else {
+            eprintln!(
+                "{} clipboard copy failed (pbcopy/xclip/xsel not found) — printing to stdout",
+                style("warning:").yellow().bold()
+            );
+            println!("{manifest}");
+        }
+    } else {
+        println!("{manifest}");
+    }
+
+    Ok(())
+}
+
+/// `lore info <package>` — shows detailed package metadata and statistics.
+async fn cmd_info(package: String, packages_dir: &std::path::Path) -> Result<(), LoreError> {
+    let path = packages_dir.join(format!("{package}.db"));
+    let db = lore_core::Db::open(&path).await.map_err(|_| {
+        LoreError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("package '{package}' is not installed"),
+        ))
+    })?;
+
+    let meta = db.get_package_meta().await?;
+
+    // File size.
+    let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let size_display = format_bytes(size_bytes);
+
+    // Node counts by kind.
+    let chunk_count = db.get_nodes_by_kind(lore_core::NodeKind::Chunk).await?.len();
+    let code_block_count = db.get_nodes_by_kind(lore_core::NodeKind::CodeBlock).await?.len();
+    let heading_count = db.get_nodes_by_kind(lore_core::NodeKind::Heading).await?.len();
+
+    // Build date from meta.
+    let build_date = db.get_meta("build_date".to_owned()).await?.unwrap_or_else(|| "—".into());
+
+    println!("{}", style(format!("Package: {}", meta.display_key())).bold());
+    println!("  Name:        {}", meta.name);
+    println!("  Registry:    {}", meta.registry);
+    println!("  Version:     {}", meta.version);
+    if let Some(desc) = &meta.description {
+        println!("  Description: {desc}");
+    }
+    if let Some(url) = &meta.source_url {
+        println!("  Source URL:  {url}");
+    }
+    if let Some(sha) = &meta.git_sha {
+        println!("  Git SHA:     {sha}");
+    }
+    println!("  Build Date:  {build_date}");
+    println!("  File Size:   {size_display}");
+    println!("  Chunks:      {chunk_count}");
+    println!("  Code Blocks: {code_block_count}");
+    println!("  Headings:    {heading_count}");
+
+    Ok(())
+}
+
 /// `lore mcp` — starts the MCP server on stdio.
 async fn cmd_mcp(packages_dir: PathBuf) -> Result<(), LoreError> {
     lore_mcp::serve_stdio(packages_dir).await
 }
 
 // ── Private helpers ────────────────────────────────────────────────────────────
+
+/// Attempts to copy `text` to the system clipboard.
+///
+/// Tries `pbcopy` (macOS), then `xclip`, then `xsel` in order.
+/// Returns `true` if the copy succeeded.
+fn try_copy_to_clipboard(text: &str) -> bool {
+    let tools: &[(&str, &[&str])] = &[
+        ("pbcopy", &[]),
+        ("xclip", &["-selection", "clipboard"]),
+        ("xsel", &["--clipboard", "--input"]),
+    ];
+
+    for (tool, args) in tools {
+        if let Ok(mut child) =
+            std::process::Command::new(tool).args(*args).stdin(std::process::Stdio::piped()).spawn()
+        {
+            if let Some(stdin) = child.stdin.take() {
+                use std::io::Write as _;
+                let mut stdin = stdin;
+                if stdin.write_all(text.as_bytes()).is_ok() {
+                    drop(stdin);
+                    if child.wait().map(|s| s.success()).unwrap_or(false) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Formats a byte count as a human-readable string (e.g. `"12.3 MB"`).
+fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{bytes} B")
+    }
+}
 
 /// Creates a cyan spinner with `msg` already ticking.
 fn make_spinner(msg: impl Into<std::borrow::Cow<'static, str>>) -> ProgressBar {

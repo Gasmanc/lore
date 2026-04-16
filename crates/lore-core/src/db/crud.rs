@@ -289,6 +289,28 @@ impl Db {
     }
 
     // -----------------------------------------------------------------------
+    // Bulk node queries
+    // -----------------------------------------------------------------------
+
+    /// Returns every node whose `kind` matches the given [`NodeKind`].
+    ///
+    /// Nodes are returned in ascending `id` order.  The result set may be
+    /// large; callers should prefer this only for offline (build-time) tasks
+    /// such as manifest generation.
+    pub async fn get_nodes_by_kind(&self, kind: NodeKind) -> Result<Vec<Node>, LoreError> {
+        let kind_str = kind.as_str().to_owned();
+        self.conn
+            .call(move |db| {
+                let sql = format!("SELECT {NODE_COLUMNS} FROM nodes WHERE kind = ?1 ORDER BY id");
+                let mut stmt = db.prepare_cached(&sql)?;
+                let rows = stmt.query_map(params![kind_str], node_from_row)?;
+                rows.collect()
+            })
+            .await
+            .map_err(LoreError::from)
+    }
+
+    // -----------------------------------------------------------------------
     // Package metadata helpers
     // -----------------------------------------------------------------------
 
