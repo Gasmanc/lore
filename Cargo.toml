@@ -7,7 +7,7 @@ version     = "0.1.0"
 edition     = "2024"
 authors     = ["Lore Contributors"]
 license     = "MIT"
-repository  = "https://github.com/lore-dev/lore"
+repository  = "https://github.com/Gasmanc/lore"
 
 [workspace.dependencies]
 # Core async / error handling
@@ -33,13 +33,16 @@ dialoguer     = { version = "0.11", features = ["fuzzy-select"] }
 console       = "0.15"
 
 # HTTP / networking
-reqwest       = { version = "0.12", features = ["json", "stream"] }
+# rustls-tls: pure-Rust TLS — no system OpenSSL required on any platform.
+reqwest       = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 
 # Build pipeline
 pulldown-cmark = "0.13"
 scraper        = "0.23"
 htmd           = "0.2"
-git2           = { version = "0.20", default-features = false, features = ["https"] }
+# vendored-openssl: bundles and compiles OpenSSL from source so cross-compilation
+# to aarch64-linux works without a sysroot OpenSSL installation.
+git2           = { version = "0.20", default-features = false, features = ["https", "vendored-openssl"] }
 walkdir        = "2"
 tempfile       = "3"
 md5            = "0.7"
