@@ -1,0 +1,9 @@
+name: sinatra
+registry: ruby
+version: "4.1.1"
+description: "DSL for quickly creating web applications in Ruby with minimal effort"
+source_url: "https://github.com/sinatra/sinatra"
+source:
+  type: git
+  url: "https://github.com/sinatra/sinatra"
+  branch: main

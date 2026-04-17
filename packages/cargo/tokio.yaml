@@ -1,9 +1,9 @@
 name: tokio
-registry: cargo
-version: "1.44.0"
-description: "An asynchronous runtime for Rust"
-source_url: "https://github.com/tokio-rs/tokio"
+registry: "cargo"
+version: "1.44.2"
+description: "An event-driven, non-blocking I/O platform for writing asynchronous I/O backed applications"
+source_url: "https://crates.io/crates/tokio"
 source:
-  type: website
-  url: "https://docs.rs/tokio/1.44.0/tokio/"
-  max_pages: 1000
+  type: git
+  url: "https://github.com/tokio-rs/website"
+  branch: master

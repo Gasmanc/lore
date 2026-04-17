@@ -1,0 +1,10 @@
+name: mojo-lang
+registry: mojo
+version: "25.3.0"
+description: "Mojo programming language — Python superset for AI/systems programming"
+source_url: "https://github.com/modularml/mojo"
+source:
+  type: git
+  url: "https://github.com/modularml/mojo"
+  branch: main
+  subdir: docs

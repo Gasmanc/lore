@@ -1,0 +1,9 @@
+name: gin
+registry: go
+version: "1.10.0"
+description: "HTTP web framework written in Go with a martini-like API"
+source_url: "https://github.com/gin-gonic/gin"
+source:
+  type: git
+  url: "https://github.com/gin-gonic/gin"
+  branch: "v1.10.0"

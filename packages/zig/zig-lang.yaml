@@ -1,0 +1,10 @@
+name: zig-lang
+registry: zig
+version: "0.14.0"
+description: "A general-purpose programming language and toolchain for maintaining robust, optimal, and reusable software"
+source_url: "https://github.com/ziglang/zig"
+source:
+  type: git
+  url: "https://github.com/ziglang/www.ziglang.org"
+  branch: master
+  subdir: content/documentation

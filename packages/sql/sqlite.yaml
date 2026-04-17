@@ -1,0 +1,9 @@
+name: sqlite
+registry: "sql"
+version: "3.49.1"
+description: "A C-language library that implements a small, fast, self-contained, high-reliability, full-featured SQL database engine"
+source_url: "https://www.sqlite.org/"
+source:
+  type: website
+  url: "https://www.sqlite.org/docs.html"
+  max_pages: 200

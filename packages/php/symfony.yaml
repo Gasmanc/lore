@@ -1,0 +1,11 @@
+name: symfony
+registry: php
+version: "7.2"
+description: "High performance PHP framework for web development"
+source_url: "https://github.com/symfony/symfony-docs"
+source:
+  type: git
+  url: "https://github.com/symfony/symfony-docs"
+  branch: "7.2"
+build:
+  exclude_examples: true

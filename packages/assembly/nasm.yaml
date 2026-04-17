@@ -1,0 +1,10 @@
+name: nasm
+registry: assembly
+version: "2.16.03"
+description: "NASM x86/x64 assembly language — the Netwide Assembler documentation"
+source_url: "https://github.com/netwide-assembler/nasm"
+source:
+  type: git
+  url: "https://github.com/netwide-assembler/nasm"
+  branch: master
+  subdir: doc

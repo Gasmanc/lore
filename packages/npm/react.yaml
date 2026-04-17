@@ -1,12 +1,10 @@
 name: react
-registry: npm
+registry: "npm"
 version: "19.1.0"
-description: "A JavaScript library for building user interfaces"
-source_url: "https://github.com/facebook/react"
+description: "The library for web and native user interfaces"
+source_url: "https://www.npmjs.com/package/react"
 source:
   type: git
-  url: "https://github.com/facebook/react"
-  branch: "v19.1.0"
-  subdir: website/src/content
-build:
-  exclude_examples: true
+  url: "https://github.com/reactjs/react.dev"
+  branch: main
+  subdir: src/content
