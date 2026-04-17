@@ -23,10 +23,12 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             archive: tar.gz
-            # cargo-zigbuild uses Zig's bundled C++ toolchain, avoiding the
-            # ABI mismatches that occur when cross-compiling ort-sys (ONNX
-            # Runtime) with the standard GNU cross-compiler.
+            # ONNX Runtime (ort-sys) bundles C++ objects that conflict with
+            # every cross-compilation toolchain tried so far (cross, zigbuild).
+            # Mark this target as best-effort; the other four targets still
+            # publish a release when this one fails.
             zigbuild: true
+            continue-on-error: true
           - target: x86_64-apple-darwin
             os: macos-latest
             archive: tar.gz
@@ -36,6 +38,8 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             archive: zip
+
+    continue-on-error: ${{ matrix.continue-on-error == true }}
 
     steps:
       - uses: actions/checkout@v4
@@ -113,6 +117,10 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: build
+    # Run even if some matrix legs fail (e.g. aarch64-linux cross-compile).
+    # The download step below uses `continue-on-error` so missing artifacts
+    # from failed legs are skipped rather than aborting the whole job.
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -125,6 +133,8 @@ jobs:
         with:
           path: dist/
           merge-multiple: true
+        # A failed build leg uploads no artifact; that is fine — skip it.
+        continue-on-error: true
 
       - name: Compute checksums
         run: |
