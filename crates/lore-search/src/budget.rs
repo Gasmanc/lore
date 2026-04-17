@@ -80,4 +80,30 @@ mod tests {
         let result = apply(vec![], 1000);
         assert!(result.is_empty());
     }
+
+    #[test]
+    fn budget_zero_still_includes_first_result() {
+        // Even with budget = 0 the first node must be returned so callers
+        // always get at least one result.
+        let nodes = vec![node_with_tokens(1, 50), node_with_tokens(2, 50)];
+        let result = apply(nodes, 0);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].node.id, 1);
+    }
+
+    #[test]
+    fn budget_exact_fit_includes_all() {
+        // Total tokens == budget exactly — all results should be included.
+        let nodes = vec![node_with_tokens(1, 100), node_with_tokens(2, 100)];
+        let result = apply(nodes, 200);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn budget_one_over_excludes_last() {
+        // 100 + 100 = 200 > 199 — only the first node fits.
+        let nodes = vec![node_with_tokens(1, 100), node_with_tokens(2, 100)];
+        let result = apply(nodes, 199);
+        assert_eq!(result.len(), 1);
+    }
 }

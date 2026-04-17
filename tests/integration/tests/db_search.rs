@@ -307,6 +307,118 @@ async fn search_pipeline_fts_only() {
     assert!(titles.contains(&Some("Cargo Install")), "cargo chunk should be in results");
 }
 
+// ── Search edge cases ─────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn search_empty_query_on_empty_db_returns_empty() {
+    let (db, _f) = temp_db().await;
+    db.rebuild_fts().await.unwrap();
+    let zero_embedding = vec![0.0f32; lore_build::embedder::EMBEDDING_DIMS];
+    let config = lore_core::SearchConfig::default();
+    let results = lore_search::search(&db, "", &zero_embedding, &config).await;
+    assert!(results.is_ok(), "empty query must not error: {results:?}");
+    assert!(results.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn search_all_special_chars_query_does_not_error() {
+    let (db, _f) = temp_db().await;
+    db.rebuild_fts().await.unwrap();
+    let zero_embedding = vec![0.0f32; lore_build::embedder::EMBEDDING_DIMS];
+    let config = lore_core::SearchConfig::default();
+    let result =
+        lore_search::search(&db, "!!@@##$$%%^^&&**()", &zero_embedding, &config).await;
+    assert!(result.is_ok(), "all-special-chars query must not error: {result:?}");
+    assert!(result.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn search_very_long_query_does_not_error() {
+    let (db, _f) = temp_db().await;
+    db.rebuild_fts().await.unwrap();
+    let long_query = "word ".repeat(200); // ~1 000 chars
+    let zero_embedding = vec![0.0f32; lore_build::embedder::EMBEDDING_DIMS];
+    let config = lore_core::SearchConfig::default();
+    let result =
+        lore_search::search(&db, long_query.trim(), &zero_embedding, &config).await;
+    assert!(result.is_ok(), "long query must not error: {result:?}");
+}
+
+#[tokio::test]
+async fn search_token_budget_zero_still_returns_one_result() {
+    // budget::apply guarantees at least one result even when budget = 0.
+    let (db, _f) = temp_db().await;
+    let doc_id = db.insert_doc("doc.md".into(), None).await.unwrap();
+    db.insert_node(NewNode {
+        parent_id: None,
+        doc_id,
+        kind: NodeKind::Chunk,
+        level: None,
+        title: Some("Install".into()),
+        content: Some("cargo install mylib".into()),
+        token_count: 3,
+        lang: None,
+    })
+    .await
+    .unwrap();
+    db.rebuild_fts().await.unwrap();
+
+    let zero_embedding = vec![0.0f32; lore_build::embedder::EMBEDDING_DIMS];
+    let config = lore_core::SearchConfig { token_budget: 0, ..Default::default() };
+    let results =
+        lore_search::search(&db, "cargo", &zero_embedding, &config).await.unwrap();
+    assert_eq!(results.len(), 1, "budget=0 must still return exactly one result");
+}
+
+// ── Corruption / missing state ─────────────────────────────────────────────────
+
+#[tokio::test]
+async fn open_corrupt_db_file_returns_error() {
+    let f = NamedTempFile::with_suffix(".db").expect("tempfile");
+    std::fs::write(f.path(), b"this is not a sqlite database file").unwrap();
+    let result = lore_core::Db::open(f.path()).await;
+    assert!(result.is_err(), "opening a corrupt file must return an error");
+}
+
+// ── Concurrent access ─────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn concurrent_searches_do_not_deadlock() {
+    let (db, _f) = temp_db().await;
+    let doc_id = db.insert_doc("doc.md".into(), None).await.unwrap();
+    for i in 0..5u32 {
+        db.insert_node(NewNode {
+            parent_id: None,
+            doc_id,
+            kind: NodeKind::Chunk,
+            level: None,
+            title: Some(format!("Section {i}")),
+            content: Some(format!("content about topic {i}")),
+            token_count: 5,
+            lang: None,
+        })
+        .await
+        .unwrap();
+    }
+    db.rebuild_fts().await.unwrap();
+
+    let zero_embedding = vec![0.0f32; lore_build::embedder::EMBEDDING_DIMS];
+    let config = lore_core::SearchConfig::default();
+
+    let (db_a, db_b) = (db.clone(), db.clone());
+    let (emb_a, emb_b) = (zero_embedding.clone(), zero_embedding);
+    let (cfg_a, cfg_b) = (config.clone(), config);
+
+    let task_a =
+        tokio::spawn(async move { lore_search::search(&db_a, "content", &emb_a, &cfg_a).await });
+    let task_b =
+        tokio::spawn(async move { lore_search::search(&db_b, "topic", &emb_b, &cfg_b).await });
+
+    let (res_a, res_b) = tokio::join!(task_a, task_b);
+    res_a.expect("task A panicked").expect("search A errored");
+    res_b.expect("task B panicked").expect("search B errored");
+}
+
 // ── get_nodes_by_kind ─────────────────────────────────────────────────────────
 
 #[tokio::test]

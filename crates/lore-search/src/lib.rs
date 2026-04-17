@@ -111,4 +111,34 @@ mod tests {
     fn sanitize_all_specials_returns_empty() {
         assert_eq!(sanitize_fts_query("!@#$%^&*()"), "");
     }
+
+    #[test]
+    fn sanitize_cjk_characters_are_preserved() {
+        // CJK chars are alphanumeric in Rust's char::is_alphanumeric(), so
+        // they pass through the sanitizer unchanged.
+        assert_eq!(sanitize_fts_query("日本語 検索"), "日本語 検索");
+    }
+
+    #[test]
+    fn sanitize_very_long_query_does_not_panic() {
+        let long = "word ".repeat(500);
+        let result = sanitize_fts_query(long.trim());
+        assert!(!result.is_empty(), "long query should produce tokens");
+    }
+
+    #[test]
+    fn sanitize_single_char_tokens_are_dropped() {
+        // Tokens shorter than 2 chars are filtered out.
+        assert_eq!(sanitize_fts_query("a b c hello"), "hello");
+    }
+
+    #[test]
+    fn sanitize_mixed_unicode_and_ascii() {
+        // Emoji are not alphanumeric — they act as separators.
+        // "hello" and "世界" (3 chars, len=9 bytes) both survive; the emoji is stripped.
+        let result = sanitize_fts_query("hello 🚀 世界");
+        assert!(result.contains("hello"), "ascii word must survive");
+        assert!(result.contains("世界"), "CJK word must survive");
+        assert!(!result.contains('🚀'), "emoji must be stripped");
+    }
 }
