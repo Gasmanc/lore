@@ -1,0 +1,10 @@
+name: angular
+registry: "npm"
+version: "19.2.0"
+description: "The modern web developer's platform — component-based framework for building scalable applications"
+source_url: "https://angular.dev/overview"
+source:
+  type: git
+  url: "https://github.com/angular/angular"
+  branch: main
+  subdir: adev/src/content

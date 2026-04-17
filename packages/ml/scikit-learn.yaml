@@ -1,0 +1,10 @@
+name: scikit-learn
+registry: "ml"
+version: "1.6.1"
+description: "Machine learning in Python — classification, regression, clustering, dimensionality reduction"
+source_url: "https://scikit-learn.org/stable/"
+source:
+  type: git
+  url: "https://github.com/scikit-learn/scikit-learn"
+  branch: main
+  subdir: doc

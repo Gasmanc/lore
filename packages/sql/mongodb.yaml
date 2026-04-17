@@ -1,0 +1,10 @@
+name: mongodb
+registry: "sql"
+version: "8.0.6"
+description: "MongoDB — general purpose document database — CRUD, aggregation pipeline, indexes, transactions"
+source_url: "https://www.mongodb.com/docs/manual/"
+source:
+  type: git
+  url: "https://github.com/mongodb/docs"
+  branch: master
+  subdir: source

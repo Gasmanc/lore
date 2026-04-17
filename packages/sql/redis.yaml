@@ -1,0 +1,8 @@
+name: redis
+registry: "sql"
+version: "8.0.0"
+description: "Redis — in-memory data structure store used as database, cache, and message broker"
+source_url: "https://redis.io/docs/latest/"
+source:
+  type: website
+  url: "https://redis.io/docs/latest/"

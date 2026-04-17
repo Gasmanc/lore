@@ -1,8 +1,8 @@
 name: nextjs
 registry: "npm"
 version: "15.3.1"
-description: "The React Framework for the Web"
-source_url: "https://www.npmjs.com/package/next"
+description: "The React Framework for the Web — file-based routing, SSR, RSC, and edge runtime"
+source_url: "https://nextjs.org/docs"
 source:
   type: git
   url: "https://github.com/vercel/next.js"

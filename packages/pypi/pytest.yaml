@@ -1,0 +1,10 @@
+name: pytest
+registry: "pypi"
+version: "8.3.5"
+description: "The pytest framework makes it easy to write small, readable tests"
+source_url: "https://docs.pytest.org/"
+source:
+  type: git
+  url: "https://github.com/pytest-dev/pytest"
+  branch: main
+  subdir: doc/en

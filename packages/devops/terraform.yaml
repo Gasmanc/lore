@@ -1,0 +1,10 @@
+name: terraform
+registry: "devops"
+version: "1.11.4"
+description: "Terraform — infrastructure as code tool for provisioning and managing cloud resources"
+source_url: "https://developer.hashicorp.com/terraform/docs"
+source:
+  type: git
+  url: "https://github.com/hashicorp/terraform"
+  branch: main
+  subdir: website/docs

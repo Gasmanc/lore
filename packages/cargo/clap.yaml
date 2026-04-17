@@ -1,0 +1,10 @@
+name: clap
+registry: "cargo"
+version: "4.5.37"
+description: "Command Line Argument Parser for Rust — derive macros, subcommands, shell completions"
+source_url: "https://docs.rs/clap/latest/clap/"
+source:
+  type: git
+  url: "https://github.com/clap-rs/clap"
+  branch: master
+  subdir: clap/src

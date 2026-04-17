@@ -1,0 +1,10 @@
+name: nestjs
+registry: "npm"
+version: "11.0.0"
+description: "A progressive Node.js framework for building efficient, reliable, scalable server-side applications"
+source_url: "https://docs.nestjs.com/"
+source:
+  type: git
+  url: "https://github.com/nestjs/docs.nestjs.com"
+  branch: master
+  subdir: content

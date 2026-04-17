@@ -1,0 +1,8 @@
+name: mysql
+registry: "sql"
+version: "9.3.0"
+description: "MySQL — world's most popular open source relational database"
+source_url: "https://dev.mysql.com/doc/refman/9.3/en/"
+source:
+  type: website
+  url: "https://dev.mysql.com/doc/refman/9.3/en/"
