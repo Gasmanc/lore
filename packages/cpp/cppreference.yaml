@@ -1,0 +1,9 @@
+name: cppreference
+registry: cpp
+version: "C++26"
+description: "C++ language reference — syntax, standard library, and language features"
+source_url: "https://en.cppreference.com/w/cpp"
+source:
+  type: website
+  url: "https://en.cppreference.com/w/cpp"
+  max_pages: 500

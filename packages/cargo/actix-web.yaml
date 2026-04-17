@@ -1,0 +1,9 @@
+name: actix-web
+registry: "cargo"
+version: "4.11.0"
+description: "Actix Web is a powerful, pragmatic, and extremely fast web framework for Rust"
+source_url: "https://crates.io/crates/actix-web"
+source:
+  type: git
+  url: "https://github.com/actix/actix-website"
+  branch: master

@@ -1,0 +1,12 @@
+name: aspnetcore
+registry: csharp
+version: "9.0"
+description: "ASP.NET Core is a cross-platform, high-performance framework for building modern, cloud-enabled, internet-connected apps"
+source_url: "https://github.com/dotnet/AspNetCore.Docs"
+source:
+  type: git
+  url: "https://github.com/dotnet/AspNetCore.Docs"
+  branch: main
+  subdir: aspnetcore
+build:
+  exclude_examples: true

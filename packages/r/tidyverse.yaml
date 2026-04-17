@@ -1,0 +1,12 @@
+name: tidyverse
+registry: r
+version: "2.0.0"
+description: "An opinionated collection of R packages designed for data science"
+source_url: "https://github.com/tidyverse/tidyverse"
+source:
+  type: git
+  url: "https://github.com/tidyverse/tidyverse.org"
+  branch: main
+  subdir: content
+build:
+  exclude_examples: true

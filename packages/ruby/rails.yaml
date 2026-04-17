@@ -1,0 +1,12 @@
+name: rails
+registry: ruby
+version: "8.0.2"
+description: "Full-stack web application framework following the MVC pattern"
+source_url: "https://github.com/rails/rails"
+source:
+  type: git
+  url: "https://github.com/rails/rails"
+  branch: main
+  subdir: guides/source
+build:
+  exclude_examples: true

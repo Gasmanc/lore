@@ -1,0 +1,10 @@
+name: pandas
+registry: "pypi"
+version: "2.2.3"
+description: "Powerful data structures for data analysis, time series, and statistics"
+source_url: "https://pypi.org/project/pandas/"
+source:
+  type: git
+  url: "https://github.com/pandas-dev/pandas"
+  branch: v2.2.3
+  subdir: doc/source
