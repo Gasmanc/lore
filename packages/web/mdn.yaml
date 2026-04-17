@@ -1,0 +1,10 @@
+name: mdn
+registry: "web"
+version: "2025"
+description: "MDN Web Docs — comprehensive reference for HTML, CSS, JavaScript, and Web APIs"
+source_url: "https://developer.mozilla.org/en-US/docs/Web"
+source:
+  type: git
+  url: "https://github.com/mdn/content"
+  branch: main
+  subdir: files/en-us/web/javascript

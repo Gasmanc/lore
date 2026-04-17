@@ -1,0 +1,9 @@
+name: deno
+registry: "node"
+version: "2.3.1"
+description: "Deno — secure JavaScript and TypeScript runtime with built-in tooling and web-standard APIs"
+source_url: "https://docs.deno.com/"
+source:
+  type: git
+  url: "https://github.com/denoland/docs"
+  branch: main

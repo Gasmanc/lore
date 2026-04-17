@@ -1,0 +1,10 @@
+name: vite
+registry: "npm"
+version: "6.3.3"
+description: "Vite — next generation frontend tooling with instant dev server and optimized builds"
+source_url: "https://vite.dev/guide/"
+source:
+  type: git
+  url: "https://github.com/vitejs/vite"
+  branch: main
+  subdir: docs

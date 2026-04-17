@@ -1,0 +1,10 @@
+name: htmx
+registry: "npm"
+version: "2.0.4"
+description: "htmx — access AJAX, CSS Transitions, WebSockets and Server Sent Events directly in HTML"
+source_url: "https://htmx.org/docs/"
+source:
+  type: git
+  url: "https://github.com/bigskysoftware/htmx"
+  branch: master
+  subdir: www/content

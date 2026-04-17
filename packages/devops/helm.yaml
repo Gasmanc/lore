@@ -1,0 +1,10 @@
+name: helm
+registry: "devops"
+version: "3.17.3"
+description: "Helm — the Kubernetes package manager for defining, installing, and upgrading applications"
+source_url: "https://helm.sh/docs/"
+source:
+  type: git
+  url: "https://github.com/helm/helm-www"
+  branch: main
+  subdir: content/en/docs

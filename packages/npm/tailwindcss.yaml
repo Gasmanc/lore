@@ -1,0 +1,10 @@
+name: tailwindcss
+registry: "npm"
+version: "4.1.4"
+description: "Tailwind CSS — utility-first CSS framework for building any design directly in your markup"
+source_url: "https://tailwindcss.com/docs"
+source:
+  type: git
+  url: "https://github.com/tailwindlabs/tailwindcss.com"
+  branch: master
+  subdir: src/pages/docs

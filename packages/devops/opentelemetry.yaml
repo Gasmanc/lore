@@ -1,0 +1,10 @@
+name: opentelemetry
+registry: "devops"
+version: "1.0"
+description: "OpenTelemetry — observability framework for distributed tracing, metrics, and logging"
+source_url: "https://opentelemetry.io/docs/"
+source:
+  type: git
+  url: "https://github.com/open-telemetry/opentelemetry.io"
+  branch: main
+  subdir: content/en/docs

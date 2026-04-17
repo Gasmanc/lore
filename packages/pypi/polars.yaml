@@ -1,0 +1,10 @@
+name: polars
+registry: "pypi"
+version: "1.26.0"
+description: "Polars — blazingly fast DataFrame library for Python and Rust with a lazy execution model"
+source_url: "https://docs.pola.rs/"
+source:
+  type: git
+  url: "https://github.com/pola-rs/polars"
+  branch: main
+  subdir: docs/source

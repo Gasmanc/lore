@@ -1,0 +1,10 @@
+name: bevy
+registry: "cargo"
+version: "0.15.3"
+description: "Bevy — refreshingly simple data-driven game engine built in Rust"
+source_url: "https://bevyengine.org/learn/"
+source:
+  type: git
+  url: "https://github.com/bevyengine/bevy-website"
+  branch: main
+  subdir: generate-assets/content

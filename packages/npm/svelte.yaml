@@ -1,0 +1,8 @@
+name: svelte
+registry: "npm"
+version: "5.28.1"
+description: "Svelte — cybernetically enhanced web apps with a compiler-based reactive framework"
+source_url: "https://svelte.dev/docs/svelte/overview"
+source:
+  type: website
+  url: "https://svelte.dev/docs/svelte/overview"
