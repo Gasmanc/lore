@@ -1,0 +1,10 @@
+name: bun
+registry: "node"
+version: "1.2.9"
+description: "Bun — fast all-in-one JavaScript runtime, bundler, test runner, and package manager"
+source_url: "https://bun.sh/docs"
+source:
+  type: git
+  url: "https://github.com/oven-sh/bun"
+  branch: main
+  subdir: docs

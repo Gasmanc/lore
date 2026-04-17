@@ -1,0 +1,10 @@
+name: nodejs
+registry: "node"
+version: "22.14.0"
+description: "Node.js — JavaScript runtime built on Chrome's V8 engine, stdlib APIs and core modules"
+source_url: "https://nodejs.org/en/docs"
+source:
+  type: git
+  url: "https://github.com/nodejs/node"
+  branch: main
+  subdir: doc/api
