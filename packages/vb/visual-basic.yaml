@@ -1,0 +1,10 @@
+name: visual-basic
+registry: vb
+version: "16.9"
+description: "Visual Basic .NET language reference and programming guide"
+source_url: "https://github.com/dotnet/docs"
+source:
+  type: git
+  url: "https://github.com/dotnet/docs"
+  branch: main
+  subdir: docs/visual-basic

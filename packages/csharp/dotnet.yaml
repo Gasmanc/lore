@@ -1,0 +1,12 @@
+name: dotnet
+registry: csharp
+version: "9.0"
+description: ".NET is a free, cross-platform, open-source developer platform for building many kinds of applications"
+source_url: "https://github.com/dotnet/docs"
+source:
+  type: git
+  url: "https://github.com/dotnet/docs"
+  branch: main
+  subdir: docs
+build:
+  exclude_examples: true

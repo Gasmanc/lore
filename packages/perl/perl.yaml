@@ -1,0 +1,9 @@
+name: perl
+registry: perl
+version: "5.40.0"
+description: "Perl 5 documentation — language reference, functions, and modules"
+source_url: "https://perldoc.perl.org"
+source:
+  type: website
+  url: "https://perldoc.perl.org"
+  max_pages: 200

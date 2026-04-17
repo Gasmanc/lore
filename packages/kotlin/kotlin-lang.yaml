@@ -1,0 +1,12 @@
+name: kotlin-lang
+registry: kotlin
+version: "2.1.20"
+description: "Kotlin is a modern, concise, and safe programming language that is interoperable with Java and other languages"
+source_url: "https://github.com/JetBrains/kotlin-web-site"
+source:
+  type: git
+  url: "https://github.com/JetBrains/kotlin-web-site"
+  branch: master
+  subdir: docs/topics
+build:
+  exclude_examples: true
