@@ -8,12 +8,20 @@ on:
   workflow_run:
     workflows: ["Release"]
     types: [completed]
+  # Allow manual dispatch to backfill a formula after the Release workflow ran.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to update (e.g. v0.1.0)"
+        required: true
+        default: "v0.1.0"
 
 jobs:
   update-formula:
     name: Update homebrew-lore formula
-    # Only run when the Release workflow succeeded.
-    if: github.event.workflow_run.conclusion == 'success'
+    # For workflow_run: only run when the Release workflow succeeded.
+    # For workflow_dispatch: always run (no workflow_run context).
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,8 +34,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # The workflow_run head_branch is the tag name (e.g. "v0.1.0")
-          TAG="${{ github.event.workflow_run.head_branch }}"
+          # workflow_run: head_branch is the tag name (e.g. "v0.1.0")
+          # workflow_dispatch: use the manual input
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.event.workflow_run.head_branch }}"
+          fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
