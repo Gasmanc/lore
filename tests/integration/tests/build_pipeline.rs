@@ -127,6 +127,46 @@ async fn parse_chunk_index_and_fts_search() {
     assert!(!hits.is_empty(), "FTS should find 'cargo' in the fixture content");
 }
 
+// ── Build edge cases (no model) ───────────────────────────────────────────────
+
+#[test]
+fn parse_and_chunk_empty_document_does_not_panic() {
+    let doc = MarkdownParser.parse("", Path::new("empty.md")).expect("parse empty must succeed");
+    let counter = TokenCounter::new().expect("tokeniser init");
+    let chunker = StructuralChunker::new(ChunkConfig::default(), counter);
+    let tree = chunker.chunk(&doc, "empty.md", 2);
+    // An empty document should produce zero or minimal output — the key
+    // invariant is that nothing panics or returns an error.
+    let _ = tree;
+}
+
+#[test]
+fn parse_and_chunk_headings_only_document_does_not_panic() {
+    let md = "# Introduction\n\n## Getting Started\n\n### Installation\n\n## Configuration\n";
+    let doc = MarkdownParser.parse(md, Path::new("headings.md")).expect("parse must succeed");
+    let counter = TokenCounter::new().expect("tokeniser init");
+    let chunker = StructuralChunker::new(ChunkConfig::default(), counter);
+    let tree = chunker.chunk(&doc, "headings.md", 2);
+    // Headings with no body may produce zero prose chunks — that is fine.
+    let _ = tree;
+}
+
+#[test]
+fn parse_and_chunk_unicode_content_does_not_panic() {
+    // Mix of CJK, Arabic (RTL), emoji, and a Rust code block.
+    let md = "# 日本語ドキュメント\n\nこのライブラリは非常に便利です。🚀\n\n\
+              ## نمونه\n\nاین یک متن فارسی است\n\n\
+              ```rust\nfn main() { println!(\"Hello, 世界!\"); }\n```\n";
+    let doc = MarkdownParser.parse(md, Path::new("unicode.md")).expect("parse must succeed");
+    let counter = TokenCounter::new().expect("tokeniser init");
+    let chunker = StructuralChunker::new(ChunkConfig::default(), counter);
+    let tree = chunker.chunk(&doc, "unicode.md", 2);
+    assert!(!tree.is_empty(), "unicode document must produce at least one chunk");
+    let code: Vec<_> =
+        tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::CodeBlock).collect();
+    assert!(!code.is_empty(), "rust code block in unicode doc must be extracted");
+}
+
 // ── Full build pipeline (requires embedding model) ────────────────────────────
 
 /// End-to-end build of the fixture package using the real embedding model.

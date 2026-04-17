@@ -148,4 +148,49 @@ mod tests {
             "both near-duplicate nodes must not both be selected"
         );
     }
+
+    #[test]
+    fn lambda_zero_does_not_panic() {
+        // lambda = 0.0 → pure diversity; must not panic or hang.
+        let candidates = vec![scored(1, 1.0), scored(2, 0.9), scored(3, 0.8)];
+        let result = select(candidates, &HashMap::new(), 0.0, 3);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn lambda_one_does_not_panic() {
+        // lambda = 1.0 → pure relevance; must not panic or hang.
+        let candidates = vec![scored(1, 1.0), scored(2, 0.9), scored(3, 0.8)];
+        let result = select(candidates, &HashMap::new(), 1.0, 3);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn all_identical_embeddings_selects_all() {
+        // All embeddings are the same — cosine_similarity = 1.0 between every
+        // pair after the first pick.  MMR must still return `limit` nodes
+        // without hanging.
+        let emb = unit_vec(&[1.0_f32, 0.0, 0.0]);
+        let mut embeddings = HashMap::new();
+        embeddings.insert(1i64, emb.clone());
+        embeddings.insert(2i64, emb.clone());
+        embeddings.insert(3i64, emb.clone());
+
+        let candidates = vec![scored(1, 3.0), scored(2, 2.0), scored(3, 1.0)];
+        let result = select(candidates, &embeddings, 0.5, 3);
+        assert_eq!(result.len(), 3, "should still select all nodes despite identical embeddings");
+    }
+
+    #[test]
+    fn empty_candidates_returns_empty() {
+        let result = select(vec![], &HashMap::new(), 0.7, 5);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn limit_larger_than_candidates_returns_all() {
+        let candidates = vec![scored(1, 1.0), scored(2, 0.5)];
+        let result = select(candidates, &HashMap::new(), 0.7, 100);
+        assert_eq!(result.len(), 2);
+    }
 }
