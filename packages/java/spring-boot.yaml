@@ -1,0 +1,12 @@
+name: spring-boot
+registry: java
+version: "3.4.5"
+description: "Convention-over-configuration framework for production-ready Spring applications"
+source_url: "https://github.com/spring-projects/spring-boot"
+source:
+  type: git
+  url: "https://github.com/spring-projects/spring-boot"
+  branch: "3.4.x"
+  subdir: spring-boot-project/spring-boot-docs/src/docs/antora/modules/ROOT/pages
+build:
+  exclude_examples: true

@@ -1,0 +1,11 @@
+name: quarkus
+registry: java
+version: "3.20.1"
+description: "Supersonic, subatomic Java framework tailored for GraalVM and HotSpot"
+source_url: "https://github.com/quarkusio/quarkus.io"
+source:
+  type: git
+  url: "https://github.com/quarkusio/quarkus.io"
+  branch: main
+build:
+  exclude_examples: true

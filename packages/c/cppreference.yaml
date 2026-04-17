@@ -1,0 +1,9 @@
+name: cppreference
+registry: c
+version: "C23"
+description: "C language reference — syntax, standard library, and language features"
+source_url: "https://en.cppreference.com/w/c"
+source:
+  type: website
+  url: "https://en.cppreference.com/w/c"
+  max_pages: 300

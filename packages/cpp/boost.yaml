@@ -1,0 +1,9 @@
+name: boost
+registry: cpp
+version: "1.88.0"
+description: "Boost C++ Libraries — peer-reviewed portable C++ source libraries"
+source_url: "https://www.boost.org/doc/libs/1_88_0/"
+source:
+  type: website
+  url: "https://www.boost.org/doc/libs/1_88_0/"
+  max_pages: 300

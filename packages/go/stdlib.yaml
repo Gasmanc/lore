@@ -1,0 +1,12 @@
+name: stdlib
+registry: go
+version: "1.24.2"
+description: "The Go standard library"
+source_url: "https://pkg.go.dev/std"
+source:
+  type: git
+  url: "https://github.com/golang/go"
+  branch: master
+  subdir: doc
+build:
+  exclude_examples: true

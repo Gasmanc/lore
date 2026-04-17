@@ -1,0 +1,11 @@
+name: vapor
+registry: swift
+version: "4.106.0"
+description: "A server-side Swift web framework"
+source_url: "https://github.com/vapor/vapor"
+source:
+  type: git
+  url: "https://github.com/vapor/docs"
+  branch: main
+build:
+  exclude_examples: true

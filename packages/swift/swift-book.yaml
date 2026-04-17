@@ -1,0 +1,10 @@
+name: swift-book
+registry: swift
+version: "6.1"
+description: "The Swift Programming Language — the official book for the Swift language"
+source_url: "https://github.com/apple/swift-book"
+source:
+  type: git
+  url: "https://github.com/apple/swift-book"
+  branch: main
+  subdir: TSPL.docc/LanguageGuide
