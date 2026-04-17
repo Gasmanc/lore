@@ -6,6 +6,7 @@
 //! - `list`     — list installed packages
 //! - `search`   — hybrid search across an installed package
 //! - `build`    — build a package from a local source directory
+//! - `update`   — rebuild installed packages from their upstream sources
 //! - `manifest` — print the compressed API surface manifest for a package
 //! - `info`     — show detailed metadata and statistics for a package
 //! - `mcp`      — start the MCP server on stdin/stdout
@@ -89,6 +90,21 @@ enum Command {
         #[arg(long)]
         exclude_examples: bool,
     },
+    /// Rebuild installed packages from their upstream sources.
+    ///
+    /// Re-fetches each package's source (git repository or website), runs the
+    /// full build pipeline, and atomically replaces the existing `.db` file.
+    /// The old database is never touched until the new one is complete —
+    /// a failed rebuild leaves the installed package intact.
+    Update {
+        /// Packages to update (e.g. `npm-next@15.0.0` or just `next`).
+        /// Omit to update every installed package.
+        packages: Vec<String>,
+        /// Show what would be rebuilt without actually rebuilding.
+        #[arg(long)]
+        check: bool,
+    },
+
     /// Print the compressed API surface manifest for an installed package.
     ///
     /// The manifest is a ~500-token index of the package's public API,
@@ -144,6 +160,7 @@ async fn main() {
             let meta = Package { name, version, registry, description, source_url, git_sha: None };
             cmd_build(source_dir, meta, output, exclude_examples, &packages_dir).await
         }
+        Command::Update { packages, check } => cmd_update(packages, check, &packages_dir).await,
         Command::Manifest { package, copy } => cmd_manifest(package, copy, &packages_dir).await,
         Command::Info { package } => cmd_info(package, &packages_dir).await,
         Command::Mcp => cmd_mcp(packages_dir).await,
@@ -444,6 +461,191 @@ async fn cmd_info(package: String, packages_dir: &std::path::Path) -> Result<(),
 /// `lore mcp` — starts the MCP server on stdio.
 async fn cmd_mcp(packages_dir: PathBuf) -> Result<(), LoreError> {
     lore_mcp::serve_stdio(packages_dir).await
+}
+
+/// `lore update [packages] [--check]` — rebuild installed packages from their upstream sources.
+///
+/// For each package the update pipeline is:
+/// 1. Read `source_url` and `git_sha` from the installed package's `meta` table.
+/// 2. Determine the source type (git repository or website crawl).
+/// 3. Fetch/clone the source into a temporary directory.
+/// 4. Run the full build pipeline, writing output to `<key>.db.tmp`.
+/// 5. Atomically rename `<key>.db.tmp` → `<key>.db`.
+///
+/// On any failure the `.tmp` file is removed and the existing `.db` is left intact.
+/// Per-package failures are reported and do not abort the remaining updates.
+async fn cmd_update(
+    packages: Vec<String>,
+    check: bool,
+    packages_dir: &std::path::Path,
+) -> Result<(), LoreError> {
+    let installed = lore_mcp::scan_packages(packages_dir).await?;
+
+    if installed.is_empty() {
+        println!("No packages installed. Use `lore add` or `lore build` first.");
+        return Ok(());
+    }
+
+    // Filter to the requested subset (match on full key or bare name).
+    let to_update: Vec<_> = if packages.is_empty() {
+        installed
+    } else {
+        installed
+            .into_iter()
+            .filter(|(key, meta)| packages.iter().any(|p| key == p || meta.name == *p))
+            .collect()
+    };
+
+    if to_update.is_empty() {
+        return Err(LoreError::NotFound(format!(
+            "no installed packages match: {}",
+            packages.join(", ")
+        )));
+    }
+
+    if check {
+        println!("Packages that would be rebuilt:\n");
+        for (key, meta) in &to_update {
+            let src = update_source_description(meta);
+            println!("  {} — {src}", style(key).bold());
+        }
+        println!("\n{} package(s) total (dry run — nothing changed)", to_update.len());
+        return Ok(());
+    }
+
+    // Initialise the builder once; the embedding model is shared across all rebuilds.
+    let cache = lore_mcp::model_cache_dir();
+    let spinner = make_spinner("Loading embedding model…");
+    let builder = tokio::task::spawn_blocking(move || lore_build::PackageBuilder::new(&cache))
+        .await
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
+    spinner.finish_and_clear();
+
+    let mut n_updated: u32 = 0;
+    let mut n_skipped: u32 = 0;
+    let mut n_failed: u32 = 0;
+
+    for (key, meta) in &to_update {
+        let source_url = match &meta.source_url {
+            Some(u) => u.clone(),
+            None => {
+                println!(
+                    "  {} {} — skipped (no remote source; use `lore build <dir>` to rebuild)",
+                    style("⟳").yellow().bold(),
+                    style(key).bold()
+                );
+                n_skipped += 1;
+                continue;
+            }
+        };
+
+        let spinner = make_spinner(format!("Updating {key}…"));
+        match rebuild_package(&builder, meta, &source_url, key, packages_dir).await {
+            Ok(stats) => {
+                spinner.finish_and_clear();
+                println!(
+                    "  {} {} — {}",
+                    style("✓").green().bold(),
+                    style(key).bold(),
+                    stats.summary()
+                );
+                n_updated += 1;
+            }
+            Err(e) => {
+                spinner.finish_and_clear();
+                eprintln!("  {} {} — {e}", style("✗").red().bold(), style(key).bold());
+                n_failed += 1;
+            }
+        }
+    }
+
+    println!();
+    println!("Updated: {n_updated}  Skipped: {n_skipped}  Failed: {n_failed}");
+
+    if n_failed > 0 {
+        Err(LoreError::Registry(format!("{n_failed} package(s) failed to update")))
+    } else {
+        Ok(())
+    }
+}
+
+/// Returns a human-readable description of where a package's source lives.
+fn update_source_description(meta: &lore_core::Package) -> String {
+    match &meta.source_url {
+        Some(url) if looks_like_git_url(url) => {
+            format!("git {url}")
+        }
+        Some(url) => format!("website {url}"),
+        None => "no remote source".to_owned(),
+    }
+}
+
+/// Returns `true` if `url` looks like a git repository URL.
+///
+/// Matches `https://{github,gitlab,bitbucket}.*`, URLs ending with `.git`,
+/// and `git://` / `git@` schemes.
+fn looks_like_git_url(url: &str) -> bool {
+    url.ends_with(".git")
+        || url.starts_with("git://")
+        || url.starts_with("git@")
+        || ["github.com", "gitlab.com", "bitbucket.org", "codeberg.org", "sr.ht"]
+            .iter()
+            .any(|h| url.contains(h))
+}
+
+/// Fetch the source, run the build pipeline, and atomically replace the `.db`.
+///
+/// Writes to `<key>.db.tmp` first.  On success the tmp file is renamed over
+/// the live `.db`.  On any error the tmp file is removed and the error is
+/// returned — the existing `.db` is never corrupted.
+async fn rebuild_package(
+    builder: &lore_build::PackageBuilder,
+    meta: &lore_core::Package,
+    source_url: &str,
+    key: &str,
+    packages_dir: &std::path::Path,
+) -> Result<lore_build::BuildStats, LoreError> {
+    // Bring the Source trait into scope so `.prepare()` is callable.
+    use lore_build::Source as _;
+
+    // Materialise the source into a temporary directory.
+    let prepared = if looks_like_git_url(source_url) {
+        lore_build::GitSource::new(source_url).prepare().await?
+    } else {
+        lore_build::WebsiteSource::new(source_url).prepare().await?
+    };
+
+    let source_dir = prepared.dir.clone();
+    let new_sha = prepared.git_sha.clone();
+
+    // Build to a tmp path so the live .db is never half-written.
+    let live_path = packages_dir.join(format!("{key}.db"));
+    let tmp_path = packages_dir.join(format!("{key}.db.tmp"));
+
+    // Update meta with the new git SHA if we got one.
+    let mut updated_meta = meta.clone();
+    if new_sha.is_some() {
+        updated_meta.git_sha = new_sha;
+    }
+
+    let result = builder.build(&source_dir, updated_meta, &tmp_path, false).await;
+
+    match result {
+        Ok(stats) => {
+            // Atomic rename — on POSIX this is guaranteed atomic.
+            tokio::fs::rename(&tmp_path, &live_path).await.map_err(|e| {
+                // Best-effort cleanup on rename failure.
+                let _ = std::fs::remove_file(&tmp_path);
+                LoreError::Io(e)
+            })?;
+            Ok(stats)
+        }
+        Err(e) => {
+            // Clean up the partial tmp file; leave the live .db untouched.
+            let _ = std::fs::remove_file(&tmp_path);
+            Err(e)
+        }
+    }
 }
 
 // ── Private helpers ────────────────────────────────────────────────────────────
