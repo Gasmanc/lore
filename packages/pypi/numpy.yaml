@@ -1,0 +1,10 @@
+name: numpy
+registry: "pypi"
+version: "2.2.4"
+description: "Fundamental package for scientific computing with Python"
+source_url: "https://numpy.org/doc/stable/"
+source:
+  type: git
+  url: "https://github.com/numpy/numpy"
+  branch: main
+  subdir: doc/source

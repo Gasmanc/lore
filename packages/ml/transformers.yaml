@@ -1,0 +1,10 @@
+name: transformers
+registry: "ml"
+version: "4.51.3"
+description: "Hugging Face Transformers — state-of-the-art ML models for NLP, vision, audio, and multimodal tasks"
+source_url: "https://huggingface.co/docs/transformers/"
+source:
+  type: git
+  url: "https://github.com/huggingface/transformers"
+  branch: main
+  subdir: docs/source/en

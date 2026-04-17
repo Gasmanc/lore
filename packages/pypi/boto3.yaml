@@ -1,0 +1,10 @@
+name: boto3
+registry: "pypi"
+version: "1.37.33"
+description: "AWS SDK for Python — access Amazon Web Services APIs from Python"
+source_url: "https://boto3.amazonaws.com/v1/documentation/api/latest/index.html"
+source:
+  type: git
+  url: "https://github.com/boto/boto3"
+  branch: develop
+  subdir: docs/source

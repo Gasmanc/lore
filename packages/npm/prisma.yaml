@@ -1,0 +1,10 @@
+name: prisma
+registry: "npm"
+version: "6.6.0"
+description: "Prisma — next-generation TypeScript ORM for Node.js with type-safe database queries"
+source_url: "https://www.prisma.io/docs/"
+source:
+  type: git
+  url: "https://github.com/prisma/docs"
+  branch: main
+  subdir: content

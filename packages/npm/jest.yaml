@@ -1,0 +1,10 @@
+name: jest
+registry: "npm"
+version: "29.7.0"
+description: "Jest — delightful JavaScript testing framework with a focus on simplicity"
+source_url: "https://jestjs.io/docs/getting-started"
+source:
+  type: git
+  url: "https://github.com/jestjs/jest"
+  branch: main
+  subdir: website/docs

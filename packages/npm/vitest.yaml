@@ -1,0 +1,10 @@
+name: vitest
+registry: "npm"
+version: "3.1.1"
+description: "Vitest — blazing fast unit testing framework powered by Vite"
+source_url: "https://vitest.dev/guide/"
+source:
+  type: git
+  url: "https://github.com/vitest-dev/vitest"
+  branch: main
+  subdir: docs

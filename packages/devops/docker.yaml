@@ -1,0 +1,10 @@
+name: docker
+registry: "devops"
+version: "27.5.1"
+description: "Docker platform docs — Dockerfile syntax, Compose, networking, volumes, and best practices"
+source_url: "https://docs.docker.com/"
+source:
+  type: git
+  url: "https://github.com/docker/docs"
+  branch: main
+  subdir: content

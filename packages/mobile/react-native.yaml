@@ -1,0 +1,10 @@
+name: react-native
+registry: "mobile"
+version: "0.79.1"
+description: "React Native — build native mobile apps for iOS and Android using React"
+source_url: "https://reactnative.dev/docs/getting-started"
+source:
+  type: git
+  url: "https://github.com/facebook/react-native-website"
+  branch: main
+  subdir: docs

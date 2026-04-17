@@ -1,0 +1,8 @@
+name: gorm
+registry: "go"
+version: "1.25.12"
+description: "The fantastic ORM library for Go — full-featured ORM with associations, hooks, transactions"
+source_url: "https://gorm.io/docs/"
+source:
+  type: website
+  url: "https://gorm.io/docs/"

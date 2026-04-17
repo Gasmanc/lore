@@ -1,0 +1,10 @@
+name: pydantic
+registry: "pypi"
+version: "2.11.3"
+description: "Data validation using Python type annotations"
+source_url: "https://docs.pydantic.dev/latest/"
+source:
+  type: git
+  url: "https://github.com/pydantic/pydantic"
+  branch: main
+  subdir: docs

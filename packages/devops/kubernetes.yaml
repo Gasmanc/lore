@@ -1,0 +1,10 @@
+name: kubernetes
+registry: "devops"
+version: "1.32.3"
+description: "Kubernetes — production-grade container orchestration, scheduling, and cluster management"
+source_url: "https://kubernetes.io/docs/home/"
+source:
+  type: git
+  url: "https://github.com/kubernetes/website"
+  branch: main
+  subdir: content/en/docs

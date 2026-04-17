@@ -1,0 +1,10 @@
+name: github-actions
+registry: "devops"
+version: "2025"
+description: "GitHub Actions — CI/CD platform for automating build, test, and deployment workflows"
+source_url: "https://docs.github.com/en/actions"
+source:
+  type: git
+  url: "https://github.com/github/docs"
+  branch: main
+  subdir: content/actions

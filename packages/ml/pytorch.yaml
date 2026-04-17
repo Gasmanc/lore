@@ -1,0 +1,8 @@
+name: pytorch
+registry: "ml"
+version: "2.6.0"
+description: "PyTorch — deep learning framework with dynamic computation graphs, autograd, and CUDA support"
+source_url: "https://pytorch.org/docs/stable/"
+source:
+  type: website
+  url: "https://pytorch.org/docs/stable/"
