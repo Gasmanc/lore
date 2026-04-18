@@ -7,4 +7,4 @@ source:
   type: git
   url: "https://github.com/bevyengine/bevy-website"
   branch: main
-  subdir: generate-assets/content
+  subdir: content

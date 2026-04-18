@@ -6,7 +6,7 @@ source_url: "https://github.com/colinhacks/zod"
 source:
   type: git
   url: "https://github.com/colinhacks/zod"
-  branch: "v3.24.2"
-  subdir: website/versioned_docs/version-3.x
+  branch: main
+  subdir: packages/docs/content
 build:
   exclude_examples: true

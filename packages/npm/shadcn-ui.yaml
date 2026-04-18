@@ -4,5 +4,7 @@ version: "2.5.0"
 description: "shadcn/ui — beautifully designed React components built with Radix UI and Tailwind CSS"
 source_url: "https://ui.shadcn.com/docs"
 source:
-  type: website
-  url: "https://ui.shadcn.com/docs"
+  type: git
+  url: "https://github.com/shadcn-ui/ui"
+  branch: main
+  subdir: apps/v4/content/docs
