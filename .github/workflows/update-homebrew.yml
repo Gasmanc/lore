@@ -1,27 +1,30 @@
 name: Update Homebrew Tap
 
-# `release: published` does not fire when softprops/action-gh-release creates
-# the release using GITHUB_TOKEN (GitHub blocks workflow→workflow loops for
-# GITHUB_TOKEN-triggered events).  workflow_run fires unconditionally once the
-# Release workflow finishes successfully.
+# Triggers:
+# 1. workflow_run — fires after the Release workflow completes (workflow→workflow
+#    loops are blocked for GITHUB_TOKEN, so we can't use `release: published`).
+# 2. workflow_dispatch — manual backfill trigger; split into a separate job so
+#    GitHub always recognises the dispatch trigger regardless of the if-condition
+#    on the shared job.
 on:
   workflow_run:
     workflows: ["Release"]
     types: [completed]
-  # Allow manual dispatch to backfill a formula after the Release workflow ran.
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to update (e.g. v0.1.0)"
+        description: "Release tag to update (e.g. v0.2.0)"
         required: true
-        default: "v0.1.0"
+        default: "v0.2.0"
 
 jobs:
   update-formula:
     name: Update homebrew-lore formula
     # For workflow_run: only run when the Release workflow succeeded.
-    # For workflow_dispatch: always run (no workflow_run context).
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # For workflow_dispatch: always run.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,13 +32,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get release tag from triggering run
+      - name: Resolve release tag
         id: tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # workflow_run: head_branch is the tag name (e.g. "v0.1.0")
-          # workflow_dispatch: use the manual input
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ github.event.inputs.tag }}"
           else
