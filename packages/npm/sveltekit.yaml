@@ -4,5 +4,7 @@ version: "2.20.2"
 description: "SvelteKit — the official Svelte application framework with file-based routing, SSR, and adapters"
 source_url: "https://svelte.dev/docs/kit/introduction"
 source:
-  type: website
-  url: "https://svelte.dev/docs/kit/introduction"
+  type: git
+  url: "https://github.com/sveltejs/kit"
+  branch: main
+  subdir: documentation/docs

@@ -4,6 +4,6 @@ version: "1.0.219"
 description: "A generic serialization/deserialization framework"
 source_url: "https://github.com/serde-rs/serde"
 source:
-  type: website
-  url: "https://docs.rs/serde/1.0.219/serde/"
-  max_pages: 500
+  type: git
+  url: "https://github.com/serde-rs/serde"
+  branch: master

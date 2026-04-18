@@ -7,4 +7,4 @@ source:
   type: git
   url: "https://github.com/prisma/docs"
   branch: main
-  subdir: content
+  subdir: apps/docs/content/docs

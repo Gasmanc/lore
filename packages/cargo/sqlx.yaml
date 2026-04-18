@@ -4,5 +4,6 @@ version: "0.8.5"
 description: "SQLx — async, compile-time checked SQL queries for Rust supporting PostgreSQL, MySQL, SQLite"
 source_url: "https://docs.rs/sqlx/latest/sqlx/"
 source:
-  type: website
-  url: "https://docs.rs/sqlx/latest/sqlx/"
+  type: git
+  url: "https://github.com/launchbadge/sqlx"
+  branch: main

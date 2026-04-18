@@ -129,22 +129,28 @@ fn find_close_tag(html: &str, tag: &str) -> usize {
     // Skip past the initial opening tag's `>` before scanning for more.
     let mut pos = lower.find('>').map_or(0, |p| p + 1);
 
-    while pos < lower.len() {
-        if lower[pos..].starts_with(&close) {
+    // Use byte-level comparisons throughout so that multibyte UTF-8 sequences
+    // (e.g. emoji in placeholder attributes) never cause a char-boundary panic.
+    let open_b = open.as_bytes();
+    let close_b = close.as_bytes();
+    let lower_b = lower.as_bytes();
+
+    while pos < lower_b.len() {
+        if lower_b[pos..].starts_with(close_b) {
             depth -= 1;
             if depth == 0 {
-                return pos + close.len();
+                return pos + close_b.len();
             }
-            pos += close.len();
-        } else if lower[pos..].starts_with(&open) {
-            let after = pos + open.len();
+            pos += close_b.len();
+        } else if lower_b[pos..].starts_with(open_b) {
+            let after = pos + open_b.len();
             if matches!(
-                lower.as_bytes().get(after).copied(),
+                lower_b.get(after).copied(),
                 Some(b'>' | b' ' | b'\n' | b'\t' | b'\r' | b'/')
             ) {
                 depth += 1;
             }
-            pos += open.len();
+            pos += open_b.len();
         } else {
             pos += 1;
         }

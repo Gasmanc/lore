@@ -4,5 +4,7 @@ version: "1.25.12"
 description: "The fantastic ORM library for Go — full-featured ORM with associations, hooks, transactions"
 source_url: "https://gorm.io/docs/"
 source:
-  type: website
-  url: "https://gorm.io/docs/"
+  type: git
+  url: "https://github.com/go-gorm/gorm.io"
+  branch: master
+  subdir: pages/docs
