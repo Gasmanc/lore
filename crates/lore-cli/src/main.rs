@@ -314,7 +314,13 @@ async fn cmd_search(
         if let Some(content) = &r.node.content {
             let preview = content.trim();
             let preview = if preview.len() > PREVIEW_LEN {
-                format!("{}…", &preview[..PREVIEW_LEN])
+                // Find the last valid UTF-8 char boundary at or before PREVIEW_LEN
+                // to avoid panicking on multibyte chars (CJK, emoji, etc.)
+                let boundary = (0..=PREVIEW_LEN)
+                    .rev()
+                    .find(|&i| preview.is_char_boundary(i))
+                    .unwrap_or(0);
+                format!("{}…", &preview[..boundary])
             } else {
                 preview.to_owned()
             };
