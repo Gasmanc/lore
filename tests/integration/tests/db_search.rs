@@ -326,8 +326,7 @@ async fn search_all_special_chars_query_does_not_error() {
     db.rebuild_fts().await.unwrap();
     let zero_embedding = vec![0.0f32; lore_build::embedder::EMBEDDING_DIMS];
     let config = lore_core::SearchConfig::default();
-    let result =
-        lore_search::search(&db, "!!@@##$$%%^^&&**()", &zero_embedding, &config).await;
+    let result = lore_search::search(&db, "!!@@##$$%%^^&&**()", &zero_embedding, &config).await;
     assert!(result.is_ok(), "all-special-chars query must not error: {result:?}");
     assert!(result.unwrap().is_empty());
 }
@@ -339,8 +338,7 @@ async fn search_very_long_query_does_not_error() {
     let long_query = "word ".repeat(200); // ~1 000 chars
     let zero_embedding = vec![0.0f32; lore_build::embedder::EMBEDDING_DIMS];
     let config = lore_core::SearchConfig::default();
-    let result =
-        lore_search::search(&db, long_query.trim(), &zero_embedding, &config).await;
+    let result = lore_search::search(&db, long_query.trim(), &zero_embedding, &config).await;
     assert!(result.is_ok(), "long query must not error: {result:?}");
 }
 
@@ -365,8 +363,7 @@ async fn search_token_budget_zero_still_returns_one_result() {
 
     let zero_embedding = vec![0.0f32; lore_build::embedder::EMBEDDING_DIMS];
     let config = lore_core::SearchConfig { token_budget: 0, ..Default::default() };
-    let results =
-        lore_search::search(&db, "cargo", &zero_embedding, &config).await.unwrap();
+    let results = lore_search::search(&db, "cargo", &zero_embedding, &config).await.unwrap();
     assert_eq!(results.len(), 1, "budget=0 must still return exactly one result");
 }
 

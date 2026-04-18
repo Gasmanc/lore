@@ -162,8 +162,7 @@ fn parse_and_chunk_unicode_content_does_not_panic() {
     let chunker = StructuralChunker::new(ChunkConfig::default(), counter);
     let tree = chunker.chunk(&doc, "unicode.md", 2);
     assert!(!tree.is_empty(), "unicode document must produce at least one chunk");
-    let code: Vec<_> =
-        tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::CodeBlock).collect();
+    let code: Vec<_> = tree.nodes.iter().filter(|(c, _)| c.kind == NodeKind::CodeBlock).collect();
     assert!(!code.is_empty(), "rust code block in unicode doc must be extracted");
 }
 
