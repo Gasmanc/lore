@@ -70,14 +70,15 @@ jobs:
         env:
           SPEC: ${{ matrix.spec }}
         run: |
-          # Extract top-level fields from YAML (no yq dependency).
-          get() { awk -v key="$1:" '$0 ~ "^"key { gsub(/^[^:]+: *"|"$/, ""); print; exit }' "$SPEC"; }
-          name=$(get name)
-          version=$(get version)
-          registry=$(get registry)
-          description=$(get description)
-          source_url=$(get source_url)
-          source_type=$(awk '/^source:/{found=1} found && /type:/{gsub(/.*type: */, ""); print; exit}' "$SPEC")
+          # `yq` (mikefarah) is preinstalled on ubuntu-latest runners and handles
+          # quoted/unquoted YAML scalars uniformly.  `// ""` coerces missing
+          # fields to the empty string so unset optional values don't blow up.
+          name=$(yq -r '.name // ""' "$SPEC")
+          version=$(yq -r '.version // ""' "$SPEC")
+          registry=$(yq -r '.registry // ""' "$SPEC")
+          description=$(yq -r '.description // ""' "$SPEC")
+          source_url=$(yq -r '.source_url // ""' "$SPEC")
+          source_type=$(yq -r '.source.type // ""' "$SPEC")
 
           outdir="dist"
           mkdir -p "$outdir"
@@ -89,9 +90,9 @@ jobs:
 
           case "$source_type" in
             git)
-              url=$(awk '/^source:/{found=1} found && /url:/{gsub(/.*url: */, ""); print; exit}' "$SPEC")
-              branch=$(awk '/^source:/{found=1} found && /branch:/{gsub(/.*branch: */, ""); print; exit}' "$SPEC")
-              subdir=$(awk '/^source:/{found=1} found && /subdir:/{gsub(/.*subdir: */, ""); print; exit}' "$SPEC")
+              url=$(yq -r '.source.url // ""' "$SPEC")
+              branch=$(yq -r '.source.branch // ""' "$SPEC")
+              subdir=$(yq -r '.source.subdir // ""' "$SPEC")
               git clone --depth 1 ${branch:+--branch "$branch"} "$url" _src
               src="_src${subdir:+/$subdir}"
               # shellcheck disable=SC2086
@@ -101,7 +102,7 @@ jobs:
                 --output "$db"
               ;;
             local)
-              dir=$(awk '/^source:/{found=1} found && /dir:/{gsub(/.*dir: */, ""); print; exit}' "$SPEC")
+              dir=$(yq -r '.source.dir // ""' "$SPEC")
               # shellcheck disable=SC2086
               ./target/release/lore build "$dir" \
                 --name "$name" --version "$version" --registry "$registry" \

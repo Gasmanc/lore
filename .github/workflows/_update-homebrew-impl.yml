@@ -1,0 +1,86 @@
+name: _update-homebrew-impl
+
+# Reusable workflow: rewrites the Gasmanc/homebrew-lore Formula/lore.rb to
+# point at the binaries from a given release tag.  Called by
+# update-homebrew.yml on successful Release runs and on manual dispatch.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.3.0)"
+        required: true
+        type: string
+
+jobs:
+  update-formula:
+    name: Update homebrew-lore formula
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download SHA256SUMS from release
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$TAG" --pattern SHA256SUMS --dir /tmp
+
+      - name: Extract checksums
+        id: sums
+        run: |
+          SUMS=/tmp/SHA256SUMS
+          extract() { grep "$1" "$SUMS" | awk '{print $1}'; }
+
+          echo "aarch64_macos=$(extract 'aarch64-apple-darwin.tar.gz')"      >> "$GITHUB_OUTPUT"
+          echo "x86_64_macos=$(extract 'x86_64-apple-darwin.tar.gz')"        >> "$GITHUB_OUTPUT"
+          echo "aarch64_linux=$(extract 'aarch64-unknown-linux-gnu.tar.gz')" >> "$GITHUB_OUTPUT"
+          echo "x86_64_linux=$(extract 'x86_64-unknown-linux-gnu.tar.gz')"   >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: Gasmanc/homebrew-lore
+          path: homebrew-lore
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Render formula from template
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          AARCH64_MACOS: ${{ steps.sums.outputs.aarch64_macos }}
+          X86_64_MACOS: ${{ steps.sums.outputs.x86_64_macos }}
+          AARCH64_LINUX: ${{ steps.sums.outputs.aarch64_linux }}
+          X86_64_LINUX: ${{ steps.sums.outputs.x86_64_linux }}
+        run: |
+          # Render install/homebrew-formula.rb.tmpl with envsubst, restricting
+          # substitution to known placeholders so `${...}` inside Ruby blocks
+          # (e.g. `#{bin}/lore`) is left untouched.
+          envsubst '$VERSION $AARCH64_MACOS $X86_64_MACOS $AARCH64_LINUX $X86_64_LINUX' \
+            < install/homebrew-formula.rb.tmpl \
+            > homebrew-lore/Formula/lore.rb
+
+      - name: Commit and push formula
+        working-directory: homebrew-lore
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/lore.rb
+          if git diff --cached --quiet; then
+            echo "Formula already up to date for ${VERSION}; nothing to commit."
+            exit 0
+          fi
+          git commit -m "lore ${VERSION}"
+          git push
