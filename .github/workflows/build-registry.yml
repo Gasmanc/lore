@@ -84,30 +84,26 @@ jobs:
           mkdir -p "$outdir"
           db="$outdir/${registry}-${name}@${version}.db"
 
-          # Build optional flags only when values are non-empty.
-          desc_flag=${description:+--description "$description"}
-          url_flag=${source_url:+--source-url "$source_url"}
+          # Use a bash array so values containing spaces (e.g. descriptions
+          # like "Tree-sitter — incremental parsing system") survive intact.
+          build_args=(--name "$name" --version "$version" --registry "$registry" --output "$db")
+          [ -n "$description" ] && build_args+=(--description "$description")
+          [ -n "$source_url" ]  && build_args+=(--source-url "$source_url")
 
           case "$source_type" in
             git)
               url=$(yq -r '.source.url // ""' "$SPEC")
               branch=$(yq -r '.source.branch // ""' "$SPEC")
               subdir=$(yq -r '.source.subdir // ""' "$SPEC")
-              git clone --depth 1 ${branch:+--branch "$branch"} "$url" _src
+              clone_args=(--depth 1)
+              [ -n "$branch" ] && clone_args+=(--branch "$branch")
+              git clone "${clone_args[@]}" "$url" _src
               src="_src${subdir:+/$subdir}"
-              # shellcheck disable=SC2086
-              ./target/release/lore build "$src" \
-                --name "$name" --version "$version" --registry "$registry" \
-                $desc_flag $url_flag \
-                --output "$db"
+              ./target/release/lore build "$src" "${build_args[@]}"
               ;;
             local)
               dir=$(yq -r '.source.dir // ""' "$SPEC")
-              # shellcheck disable=SC2086
-              ./target/release/lore build "$dir" \
-                --name "$name" --version "$version" --registry "$registry" \
-                $desc_flag $url_flag \
-                --output "$db"
+              ./target/release/lore build "$dir" "${build_args[@]}"
               ;;
             website)
               echo "Source type 'website' requires a live crawl and is not supported in CI."
