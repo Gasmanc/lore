@@ -153,6 +153,63 @@ impl RegistryClient {
     }
 }
 
+// ── Upstream version checks ───────────────────────────────────────────────────
+
+/// Query the upstream package registry (crates.io, npm, PyPI) for the latest
+/// stable version of `name`.
+///
+/// Returns `Ok(None)` for registries we don't know how to query.
+///
+/// # Errors
+///
+/// Returns [`LoreError::Registry`] on HTTP or parse errors.
+#[instrument(skip(http))]
+pub async fn fetch_latest_upstream_version(
+    http: &reqwest::Client,
+    registry: &str,
+    name: &str,
+) -> Result<Option<String>, LoreError> {
+    let url = match registry {
+        "cargo" => format!("https://crates.io/api/v1/crates/{name}"),
+        "npm" => format!("https://registry.npmjs.org/{name}/latest"),
+        "pypi" => format!("https://pypi.org/pypi/{name}/json"),
+        _ => return Ok(None),
+    };
+
+    let resp = http
+        .get(&url)
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| LoreError::Registry(e.to_string()))?
+        .error_for_status()
+        .map_err(|e| LoreError::Registry(e.to_string()))?;
+
+    let body: serde_json::Value =
+        resp.json().await.map_err(|e| LoreError::Registry(e.to_string()))?;
+
+    let version = match registry {
+        "cargo" => body.pointer("/crate/max_stable_version").and_then(|v| v.as_str()),
+        "npm" => body.get("version").and_then(|v| v.as_str()),
+        "pypi" => body.pointer("/info/version").and_then(|v| v.as_str()),
+        _ => None,
+    };
+
+    Ok(version.map(std::borrow::ToOwned::to_owned))
+}
+
+/// Build a default reqwest client with the lore user agent.
+///
+/// # Errors
+///
+/// Returns [`LoreError::Registry`] if the client cannot be constructed.
+pub fn default_http_client() -> Result<reqwest::Client, LoreError> {
+    reqwest::Client::builder()
+        .user_agent(concat!("lore/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| LoreError::Registry(e.to_string()))
+}
+
 // ── Private helpers ────────────────────────────────────────────────────────────
 
 fn download_style() -> ProgressStyle {

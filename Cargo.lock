@@ -1807,7 +1807,7 @@ dependencies = [
 
 [[package]]
 name = "lore-bench"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lore-build",
  "lore-core",
@@ -1821,7 +1821,7 @@ dependencies = [
 
 [[package]]
 name = "lore-build"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs-next",
  "fastembed",
@@ -1844,7 +1844,7 @@ dependencies = [
 
 [[package]]
 name = "lore-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "clap",
  "console",
@@ -1863,7 +1863,7 @@ dependencies = [
 
 [[package]]
 name = "lore-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "rusqlite",
  "serde",
@@ -1890,7 +1890,7 @@ dependencies = [
 
 [[package]]
 name = "lore-mcp"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs-next",
  "lore-build",
@@ -1904,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "lore-registry"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "indicatif",
@@ -1919,7 +1919,7 @@ dependencies = [
 
 [[package]]
 name = "lore-search"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lore-core",
  "tokio",
