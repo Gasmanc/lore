@@ -1,0 +1,10 @@
+name: tree-sitter
+registry: "cargo"
+version: "0.26.8"
+description: "Tree-sitter — incremental parsing system for programming tools"
+source_url: "https://crates.io/crates/tree-sitter"
+source:
+  type: git
+  url: "https://github.com/tree-sitter/tree-sitter"
+  branch: master
+  subdir: docs/src

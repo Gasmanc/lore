@@ -1,0 +1,10 @@
+name: "@xyflow/react"
+registry: "npm"
+version: "12.10.2"
+description: "React Flow — powerful open source library for building node-based UIs with React"
+source_url: "https://www.npmjs.com/package/@xyflow/react"
+source:
+  type: git
+  url: "https://github.com/xyflow/web"
+  branch: main
+  subdir: sites/reactflow.dev/src/content

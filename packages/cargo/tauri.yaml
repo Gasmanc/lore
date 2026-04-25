@@ -1,0 +1,10 @@
+name: tauri
+registry: "cargo"
+version: "2.10.3"
+description: "Build smaller, faster, and more secure desktop applications with a web frontend"
+source_url: "https://crates.io/crates/tauri"
+source:
+  type: git
+  url: "https://github.com/tauri-apps/tauri-docs"
+  branch: v2
+  subdir: src/content/docs
