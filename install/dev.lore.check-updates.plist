@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd agent that runs `lore check-updates` weekly and posts a macOS
+  notification if anything is stale.
+
+  Install:
+    cp install/check-updates-notify.sh ~/.local/bin/lore-check-updates.sh
+    chmod +x ~/.local/bin/lore-check-updates.sh
+    cp install/dev.lore.check-updates.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/dev.lore.check-updates.plist
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/dev.lore.check-updates.plist
+    rm ~/Library/LaunchAgents/dev.lore.check-updates.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.lore.check-updates</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>$HOME/.local/bin/lore-check-updates.sh</string>
+    </array>
+
+    <!-- Weekly: every Monday at 10:00 local time. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- If the laptop was asleep at the scheduled time, run as soon as it wakes. -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/lore-check-updates.out</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/lore-check-updates.err</string>
+</dict>
+</plist>

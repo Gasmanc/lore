@@ -121,6 +121,12 @@ enum Command {
         /// Package key (e.g. `npm-next@15.0.0`).
         package: String,
     },
+    /// Check installed packages against their upstream registries for newer versions.
+    ///
+    /// Queries crates.io, npm, and PyPI for the latest stable version of each
+    /// installed package and prints a table of any drift.  Exit code 1 if any
+    /// package is out of date.
+    CheckUpdates,
     /// Start the MCP server on stdin/stdout (for use by AI coding assistants).
     Mcp,
 }
@@ -163,6 +169,7 @@ async fn main() {
         Command::Update { packages, check } => cmd_update(packages, check, &packages_dir).await,
         Command::Manifest { package, copy } => cmd_manifest(package, copy, &packages_dir).await,
         Command::Info { package } => cmd_info(package, &packages_dir).await,
+        Command::CheckUpdates => cmd_check_updates(&packages_dir).await,
         Command::Mcp => cmd_mcp(packages_dir).await,
     };
 
@@ -461,6 +468,75 @@ async fn cmd_info(package: String, packages_dir: &std::path::Path) -> Result<(),
     println!("  Code Blocks: {code_block_count}");
     println!("  Headings:    {heading_count}");
 
+    Ok(())
+}
+
+/// `lore check-updates` — query upstream registries for newer versions of installed packages.
+///
+/// Returns `Err` (exit code 1) if any package is out of date so the command
+/// composes cleanly with `launchd`/cron and macOS notification scripts.
+async fn cmd_check_updates(packages_dir: &std::path::Path) -> Result<(), LoreError> {
+    let installed = lore_mcp::scan_packages(packages_dir).await?;
+    if installed.is_empty() {
+        println!("No packages installed.");
+        return Ok(());
+    }
+
+    let http = lore_registry::default_http_client()?;
+
+    let mut rows: Vec<(String, String, String, String)> = Vec::new(); // (key, current, latest, status)
+    let mut n_stale: u32 = 0;
+    let mut n_unknown: u32 = 0;
+
+    for (key, meta) in &installed {
+        let latest =
+            lore_registry::fetch_latest_upstream_version(&http, &meta.registry, &meta.name).await;
+        let (latest_str, status) = match latest {
+            Ok(Some(v)) if v == meta.version => (v, style("up to date").dim().to_string()),
+            Ok(Some(v)) => {
+                n_stale += 1;
+                (v, style("UPDATE").yellow().bold().to_string())
+            }
+            Ok(None) => {
+                n_unknown += 1;
+                ("—".to_owned(), style("unsupported registry").dim().to_string())
+            }
+            Err(e) => {
+                n_unknown += 1;
+                ("?".to_owned(), style(format!("error: {e}")).red().to_string())
+            }
+        };
+        rows.push((key.clone(), meta.version.clone(), latest_str, status));
+    }
+
+    let key_w = rows.iter().map(|r| r.0.len()).max().unwrap_or(0).max(7);
+    let cur_w = rows.iter().map(|r| r.1.len()).max().unwrap_or(0).max(7);
+    let lat_w = rows.iter().map(|r| r.2.len()).max().unwrap_or(0).max(6);
+
+    println!(
+        "{:<key_w$}  {:<cur_w$}  {:<lat_w$}  {}",
+        style("Package").bold(),
+        style("Current").bold(),
+        style("Latest").bold(),
+        style("Status").bold(),
+    );
+    for (key, current, latest, status) in &rows {
+        println!("{key:<key_w$}  {current:<cur_w$}  {latest:<lat_w$}  {status}");
+    }
+
+    println!();
+    if n_stale > 0 {
+        println!(
+            "{} {n_stale} package(s) out of date — bump the version field in the spec and push.",
+            style("⚠").yellow().bold()
+        );
+        return Err(LoreError::Registry(format!("{n_stale} package(s) out of date")));
+    }
+    if n_unknown > 0 {
+        println!("{n_unknown} package(s) could not be checked.");
+    } else {
+        println!("{} All packages up to date.", style("✓").green().bold());
+    }
     Ok(())
 }
 
