@@ -2,7 +2,7 @@ name: Build Registry
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     paths:
       - "packages/**"
   workflow_dispatch:
