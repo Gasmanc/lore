@@ -1,8 +1,0 @@
-name: rspec
-registry: "ruby"
-version: "3.13.2"
-description: "RSpec — behaviour driven development framework for Ruby"
-source_url: "https://rspec.info/documentation/"
-source:
-  type: website
-  url: "https://rspec.info/documentation/"

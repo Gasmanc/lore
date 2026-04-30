@@ -1,9 +1,0 @@
-name: postgresql
-registry: "sql"
-version: "17.4"
-description: "The world's most advanced open source relational database"
-source_url: "https://www.postgresql.org/"
-source:
-  type: website
-  url: "https://www.postgresql.org/docs/17/index.html"
-  max_pages: 400
