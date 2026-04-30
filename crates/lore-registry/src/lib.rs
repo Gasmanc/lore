@@ -50,7 +50,13 @@ pub struct RegistryClient {
 
 impl RegistryClient {
     /// The default public registry URL.
-    pub const DEFAULT_URL: &'static str = "https://registry.lore.dev";
+    ///
+    /// Packages are published as GitHub Release assets under the `registry`
+    /// tag, so no separate server is needed — the release itself IS the
+    /// registry.  The `download_url` fields in `index.json` are already
+    /// absolute GitHub URLs; `base_url` is only used to locate `index.json`.
+    pub const DEFAULT_URL: &'static str =
+        "https://github.com/Gasmanc/lore/releases/download/registry";
 
     /// Create a new client pointed at `base_url`.
     ///

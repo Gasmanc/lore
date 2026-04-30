@@ -143,18 +143,51 @@ jobs:
           path: dist/
           merge-multiple: true
 
+      - name: Fetch existing index from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Download the current live index so we can merge new builds into it
+          # rather than replacing the entire catalogue on each single-package run.
+          if gh release download registry --repo "$REPO" --pattern index.json --output dist/existing-index.json 2>/dev/null; then
+            echo "Fetched existing index ($(jq length dist/existing-index.json) entries)"
+          else
+            echo "No existing index found; starting fresh."
+            echo '[]' > dist/existing-index.json
+          fi
+
       - name: Build index.json
         env:
           REPO: ${{ github.repository }}
         run: |
-          mapfile -d '' files < <(find dist -name '*.json' -print0 | sort -z)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo '[]' > dist/index.json
-          else
-            jq -s --arg repo "$REPO" \
-              'map(. + {download_url: ("https://github.com/\($repo)/releases/download/registry/" + .package.registry + "-" + .package.name + "@" + .package.version + ".db")})' \
-              "${files[@]}" > dist/index.json
-          fi
+          # PackageMetadata is #[serde(flatten)] so the JSON sidecar is flat:
+          # { "name": "...", "registry": "...", "version": "...", ... }
+          # Use .registry / .name / .version (not .package.*).
+          build_entry() {
+            jq --arg repo "$REPO" \
+              '. + {download_url: ("https://github.com/\($repo)/releases/download/registry/" + .registry + "-" + .name + "@" + .version + ".db")}' \
+              "$1"
+          }
+
+          mapfile -d '' new_files < <(find dist -name '*.json' ! -name 'existing-index.json' -print0 | sort -z)
+
+          # Build array of newly-built entries (with corrected download_url).
+          new_entries='[]'
+          for f in "${new_files[@]}"; do
+            entry=$(build_entry "$f")
+            new_entries=$(echo "$new_entries" | jq --argjson e "$entry" '. + [$e]')
+          done
+
+          # Merge: existing entries whose key isn't in this run + new entries.
+          jq -s \
+            '.[0] as $existing | .[1] as $new |
+             ($new | map(.registry + "-" + .name + "@" + .version)) as $updated_keys |
+             ($existing | map(select((.registry + "-" + .name + "@" + .version) as $k | $updated_keys | index($k) | not))) +
+             $new' \
+            dist/existing-index.json <(echo "$new_entries") > dist/index.json
+
+          echo "Final index: $(jq length dist/index.json) entries"
 
       - name: Upload registry release
         uses: softprops/action-gh-release@v2
