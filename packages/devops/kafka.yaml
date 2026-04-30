@@ -4,5 +4,7 @@ version: "4.0.0"
 description: "Apache Kafka — distributed event streaming platform for high-performance data pipelines"
 source_url: "https://kafka.apache.org/documentation/"
 source:
-  type: website
-  url: "https://kafka.apache.org/documentation/"
+  type: git
+  url: "https://github.com/apache/kafka"
+  branch: trunk
+  subdir: docs

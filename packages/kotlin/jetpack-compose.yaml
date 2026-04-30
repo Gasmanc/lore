@@ -1,8 +1,0 @@
-name: jetpack-compose
-registry: "kotlin"
-version: "1.7.8"
-description: "Jetpack Compose — Android's modern declarative UI toolkit built with Kotlin"
-source_url: "https://developer.android.com/compose"
-source:
-  type: website
-  url: "https://developer.android.com/develop/ui/compose/documentation"
