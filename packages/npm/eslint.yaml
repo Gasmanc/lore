@@ -7,4 +7,4 @@ source:
   type: git
   url: "https://github.com/eslint/eslint.org"
   branch: main
-  subdir: src/content/docs
+  subdir: src/content

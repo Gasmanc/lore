@@ -6,4 +6,4 @@ source_url: "https://crates.io/crates/libublk"
 source:
   type: git
   url: "https://github.com/ublk-org/libublk-rs"
-  branch: master
+  branch: main

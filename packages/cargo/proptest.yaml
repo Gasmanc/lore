@@ -6,5 +6,5 @@ source_url: "https://crates.io/crates/proptest"
 source:
   type: git
   url: "https://github.com/proptest-rs/proptest"
-  branch: master
+  branch: main
   subdir: book/src

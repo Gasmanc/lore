@@ -6,4 +6,4 @@ source_url: "https://crates.io/crates/reed-solomon-simd"
 source:
   type: git
   url: "https://github.com/AndersTrier/reed-solomon-simd"
-  branch: main
+  branch: master

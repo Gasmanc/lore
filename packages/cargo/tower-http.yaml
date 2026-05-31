@@ -6,4 +6,4 @@ source_url: "https://crates.io/crates/tower-http"
 source:
   type: git
   url: "https://github.com/tower-rs/tower-http"
-  branch: master
+  branch: main

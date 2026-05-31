@@ -7,4 +7,3 @@ source:
   type: git
   url: "https://github.com/datafuselabs/openraft"
   branch: main
-  subdir: website
