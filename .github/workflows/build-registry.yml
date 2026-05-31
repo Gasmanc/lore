@@ -27,19 +27,36 @@ jobs:
         id: scan
         env:
           INPUT_PACKAGE: ${{ github.event.inputs.package }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
         run: |
           if [ -n "$INPUT_PACKAGE" ]; then
+            # workflow_dispatch with a specific package
             spec="packages/${INPUT_PACKAGE}.yaml"
             matrix=$(printf '["%s"]' "$spec" | jq -c '.')
+          elif [ "$EVENT" = "push" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # Push event: only rebuild specs that changed in this push
+            git fetch --depth=1 origin "$BEFORE" 2>/dev/null || true
+            changed=$(git diff --name-only "$BEFORE" "$AFTER" -- 'packages/' 2>/dev/null \
+              | grep '\.yaml$' || true)
+            if [ -n "$changed" ]; then
+              matrix=$(echo "$changed" | jq -R . | jq -sc '.')
+            else
+              matrix='[]'
+            fi
           else
+            # workflow_dispatch (no package) or initial push: rebuild all
             matrix=$(find packages -maxdepth 2 -name '*.yaml' | sort | jq -R . | jq -sc '.')
           fi
+          echo "Specs to build: $(echo "$matrix" | jq length)"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ matrix.spec }}
     needs: discover
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
