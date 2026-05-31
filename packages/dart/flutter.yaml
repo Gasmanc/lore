@@ -7,4 +7,4 @@ source:
   type: git
   url: "https://github.com/flutter/website"
   branch: main
-  subdir: src/content
+  subdir: sites/docs/src/content

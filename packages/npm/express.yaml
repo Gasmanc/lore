@@ -6,5 +6,5 @@ source_url: "https://expressjs.com/"
 source:
   type: git
   url: "https://github.com/expressjs/expressjs.com"
-  branch: gh-pages
-  subdir: en
+  branch: main
+  subdir: src/content
