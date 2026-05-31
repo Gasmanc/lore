@@ -107,7 +107,8 @@ impl PackageBuilder {
     ///
     /// `meta` is written to the `meta` table after all documents are indexed.
     /// Set `exclude_examples` to `true` to skip `examples/`, `tests/`, and
-    /// similar directories.
+    /// similar directories.  Pass additional directory names to skip via
+    /// `exclude_dirs` (e.g. `&["release".to_string()]`).
     ///
     /// # Errors
     ///
@@ -120,6 +121,7 @@ impl PackageBuilder {
         meta: Package,
         output_path: &Path,
         exclude_examples: bool,
+        exclude_dirs: &[String],
     ) -> Result<BuildStats, LoreError> {
         let start = Instant::now();
 
@@ -131,7 +133,7 @@ impl PackageBuilder {
         self.write_meta(&db, &meta).await?;
 
         // Discover documentation files.
-        let files = discover_files(source_dir, exclude_examples)?;
+        let files = discover_files(source_dir, exclude_examples, exclude_dirs)?;
         info!(count = files.len(), "discovered documentation files");
 
         // Build the indexer once and reuse it for all files.

@@ -10,3 +10,5 @@ source:
   subdir: sites/docs/src/content
 build:
   exclude_examples: true
+  exclude_dirs:
+    - release

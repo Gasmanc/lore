@@ -56,11 +56,17 @@ pub const EXAMPLE_DIRS: &[&str] =
 /// * `exclude_examples` — when `true`, also skip directories named
 ///   `examples`, `example`, `fixtures`, `fixture`, `test`, `tests`,
 ///   `spec`, `specs`.
+/// * `exclude_dirs` — additional directory names to skip (e.g. `["release"]`
+///   to drop Flutter's changelog directory from indexing).
 ///
 /// # Errors
 ///
 /// Returns [`LoreError::Io`] if any directory entry cannot be read.
-pub fn discover_files(root: &Path, exclude_examples: bool) -> Result<Vec<PathBuf>, LoreError> {
+pub fn discover_files(
+    root: &Path,
+    exclude_examples: bool,
+    exclude_dirs: &[String],
+) -> Result<Vec<PathBuf>, LoreError> {
     let mut files: Vec<PathBuf> = Vec::new();
 
     let walker = WalkDir::new(root).into_iter().filter_entry(|entry| {
@@ -68,6 +74,7 @@ pub fn discover_files(root: &Path, exclude_examples: bool) -> Result<Vec<PathBuf
             if let Some(name) = entry.file_name().to_str() {
                 if EXCLUDED_DIRS.contains(&name)
                     || (exclude_examples && EXAMPLE_DIRS.contains(&name))
+                    || exclude_dirs.iter().any(|d| d == name)
                 {
                     return false;
                 }
@@ -125,7 +132,7 @@ mod tests {
         fs::write(dir.path().join("one.md"), "# One").unwrap();
         fs::write(dir.path().join("two.md"), "# Two").unwrap();
         fs::write(dir.path().join("three.md"), "# Three").unwrap();
-        let files = discover_files(dir.path(), false).unwrap();
+        let files = discover_files(dir.path(), false, &[]).unwrap();
         assert_eq!(files.len(), 3);
     }
 
@@ -135,7 +142,7 @@ mod tests {
         for ext in INCLUDED_EXTENSIONS {
             fs::write(dir.path().join(format!("doc.{ext}")), "content").unwrap();
         }
-        let files = discover_files(dir.path(), false).unwrap();
+        let files = discover_files(dir.path(), false, &[]).unwrap();
         assert_eq!(files.len(), INCLUDED_EXTENSIONS.len());
     }
 
@@ -146,7 +153,7 @@ mod tests {
         fs::create_dir(&nm).unwrap();
         fs::write(nm.join("docs.md"), "# Docs").unwrap();
         fs::write(dir.path().join("readme.md"), "# Readme").unwrap();
-        let files = discover_files(dir.path(), false).unwrap();
+        let files = discover_files(dir.path(), false, &[]).unwrap();
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("readme.md"));
     }
@@ -156,7 +163,7 @@ mod tests {
         let dir = setup();
         fs::write(dir.path().join("CHANGELOG.md"), "## v1.0.0").unwrap();
         fs::write(dir.path().join("CHANGELOG.rst"), "v1").unwrap();
-        let files = discover_files(dir.path(), false).unwrap();
+        let files = discover_files(dir.path(), false, &[]).unwrap();
         assert_eq!(files.len(), 0, "CHANGELOG files must be excluded");
     }
 
@@ -167,7 +174,7 @@ mod tests {
         fs::write(dir.path().join("license.md"), "MIT").unwrap();
         fs::write(dir.path().join("Licence.md"), "Apache").unwrap();
         fs::write(dir.path().join("guide.md"), "# Guide").unwrap();
-        let files = discover_files(dir.path(), false).unwrap();
+        let files = discover_files(dir.path(), false, &[]).unwrap();
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("guide.md"));
     }
@@ -181,13 +188,32 @@ mod tests {
         fs::write(dir.path().join("readme.md"), "# Readme").unwrap();
 
         // Without exclude_examples, the file IS found.
-        let without = discover_files(dir.path(), false).unwrap();
+        let without = discover_files(dir.path(), false, &[]).unwrap();
         assert_eq!(without.len(), 2);
 
         // With exclude_examples, the file is skipped.
-        let with_exclude = discover_files(dir.path(), true).unwrap();
+        let with_exclude = discover_files(dir.path(), true, &[]).unwrap();
         assert_eq!(with_exclude.len(), 1);
         assert!(with_exclude[0].ends_with("readme.md"));
+    }
+
+    #[test]
+    fn test_excludes_named_dirs() {
+        let dir = setup();
+        let release = dir.path().join("release");
+        fs::create_dir(&release).unwrap();
+        fs::write(release.join("notes.md"), "# v1.0").unwrap();
+        fs::write(dir.path().join("guide.md"), "# Guide").unwrap();
+
+        // Without exclude_dirs, release/ IS found.
+        let without = discover_files(dir.path(), false, &[]).unwrap();
+        assert_eq!(without.len(), 2);
+
+        // With exclude_dirs, release/ is skipped.
+        let with_exclude =
+            discover_files(dir.path(), false, &["release".to_string()]).unwrap();
+        assert_eq!(with_exclude.len(), 1);
+        assert!(with_exclude[0].ends_with("guide.md"));
     }
 
     #[test]
@@ -196,7 +222,7 @@ mod tests {
         fs::write(dir.path().join("main.rs"), "fn main() {}").unwrap();
         fs::write(dir.path().join("data.json"), "{}").unwrap();
         fs::write(dir.path().join("doc.md"), "# Doc").unwrap();
-        let files = discover_files(dir.path(), false).unwrap();
+        let files = discover_files(dir.path(), false, &[]).unwrap();
         assert_eq!(files.len(), 1);
     }
 
@@ -206,7 +232,7 @@ mod tests {
         fs::write(dir.path().join("z.md"), "# Z").unwrap();
         fs::write(dir.path().join("a.md"), "# A").unwrap();
         fs::write(dir.path().join("m.md"), "# M").unwrap();
-        let files = discover_files(dir.path(), false).unwrap();
+        let files = discover_files(dir.path(), false, &[]).unwrap();
         let names: Vec<_> =
             files.iter().map(|p| p.file_name().unwrap().to_str().unwrap()).collect();
         assert_eq!(names, ["a.md", "m.md", "z.md"]);

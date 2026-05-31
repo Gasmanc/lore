@@ -89,6 +89,10 @@ enum Command {
         /// Exclude `examples/`, `tests/`, and similar directories.
         #[arg(long)]
         exclude_examples: bool,
+        /// Additional directory names to exclude (may be repeated).
+        /// e.g. `--exclude-dir release --exclude-dir changelog`
+        #[arg(long, value_name = "DIR")]
+        exclude_dir: Vec<String>,
     },
     /// Rebuild installed packages from their upstream sources.
     ///
@@ -162,9 +166,10 @@ async fn main() {
             description,
             source_url,
             exclude_examples,
+            exclude_dir,
         } => {
             let meta = Package { name, version, registry, description, source_url, git_sha: None };
-            cmd_build(source_dir, meta, output, exclude_examples, &packages_dir).await
+            cmd_build(source_dir, meta, output, exclude_examples, exclude_dir, &packages_dir).await
         }
         Command::Update { packages, check } => cmd_update(packages, check, &packages_dir).await,
         Command::Manifest { package, copy } => cmd_manifest(package, copy, &packages_dir).await,
@@ -344,6 +349,7 @@ async fn cmd_build(
     meta: Package,
     output: Option<PathBuf>,
     exclude_examples: bool,
+    exclude_dirs: Vec<String>,
     packages_dir: &std::path::Path,
 ) -> Result<(), LoreError> {
     let display_key = meta.display_key();
@@ -359,7 +365,7 @@ async fn cmd_build(
         .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
 
     let meta_ref = meta.clone();
-    let stats = builder.build(&source_dir, meta, &output_path, exclude_examples).await?;
+    let stats = builder.build(&source_dir, meta, &output_path, exclude_examples, &exclude_dirs).await?;
 
     spinner.finish_and_clear();
 
@@ -710,7 +716,7 @@ async fn rebuild_package(
         updated_meta.git_sha = new_sha;
     }
 
-    let result = builder.build(&source_dir, updated_meta, &tmp_path, false).await;
+    let result = builder.build(&source_dir, updated_meta, &tmp_path, false, &[]).await;
 
     match result {
         Ok(stats) => {

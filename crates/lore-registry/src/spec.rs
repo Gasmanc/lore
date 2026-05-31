@@ -77,6 +77,12 @@ pub struct BuildOptions {
     /// Skip `examples/`, `tests/`, and similar directories.
     #[serde(default)]
     pub exclude_examples: bool,
+    /// Additional directory names to exclude from indexing.
+    /// Useful for dropping changelog, release-notes, or other large
+    /// directories that aren't useful for documentation search.
+    /// e.g. `exclude_dirs: [release, changelogs]`
+    #[serde(default)]
+    pub exclude_dirs: Vec<String>,
 }
 
 // ── Loading ───────────────────────────────────────────────────────────────────

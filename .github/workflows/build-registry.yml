@@ -173,6 +173,9 @@ jobs:
           build_args=(--name "$name" --version "$version" --registry "$registry" --output "$db")
           [ -n "$description" ] && build_args+=(--description "$description")
           [ -n "$source_url" ]  && build_args+=(--source-url "$source_url")
+          while IFS= read -r dir; do
+            [ -n "$dir" ] && build_args+=(--exclude-dir "$dir")
+          done < <(yq -r '.build.exclude_dirs // [] | .[]' "$SPEC" 2>/dev/null || true)
 
           case "$source_type" in
             git)
