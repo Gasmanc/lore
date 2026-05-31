@@ -1,0 +1,9 @@
+name: jsonrpsee
+registry: cargo
+version: "0.24.7"
+description: "JSON-RPC 2.0 server and client library for Rust with async/await support"
+source_url: "https://crates.io/crates/jsonrpsee"
+source:
+  type: git
+  url: "https://github.com/paritytech/jsonrpsee"
+  branch: master

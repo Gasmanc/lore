@@ -1,0 +1,9 @@
+name: libcryptsetup-rs
+registry: cargo
+version: "0.9.1"
+description: "Rust bindings for the libcryptsetup API (LUKS disk encryption)"
+source_url: "https://crates.io/crates/libcryptsetup-rs"
+source:
+  type: git
+  url: "https://github.com/stratis-storage/libcryptsetup-rs"
+  branch: master

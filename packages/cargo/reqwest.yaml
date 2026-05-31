@@ -1,0 +1,9 @@
+name: reqwest
+registry: cargo
+version: "0.12.12"
+description: "higher level HTTP client library"
+source_url: "https://crates.io/crates/reqwest"
+source:
+  type: git
+  url: "https://github.com/seanmonstar/reqwest"
+  branch: master

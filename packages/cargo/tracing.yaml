@@ -1,0 +1,9 @@
+name: tracing
+registry: cargo
+version: "0.1.41"
+description: "Application-level tracing for Rust — structured, event-based diagnostics"
+source_url: "https://crates.io/crates/tracing"
+source:
+  type: git
+  url: "https://github.com/tokio-rs/tracing"
+  branch: master

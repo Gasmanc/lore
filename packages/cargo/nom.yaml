@@ -1,0 +1,9 @@
+name: nom
+registry: cargo
+version: "7.1.3"
+description: "A byte-oriented, zero-copy, parser combinators library"
+source_url: "https://crates.io/crates/nom"
+source:
+  type: git
+  url: "https://github.com/rust-bakery/nom"
+  branch: main

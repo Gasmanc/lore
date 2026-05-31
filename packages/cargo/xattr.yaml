@@ -1,0 +1,9 @@
+name: xattr
+registry: cargo
+version: "1.3.1"
+description: "Unix extended filesystem attributes"
+source_url: "https://crates.io/crates/xattr"
+source:
+  type: git
+  url: "https://github.com/Stebalien/xattr"
+  branch: master

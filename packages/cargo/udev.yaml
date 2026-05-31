@@ -1,0 +1,9 @@
+name: udev
+registry: cargo
+version: "0.8.0"
+description: "Rust bindings to the libudev library for device enumeration and monitoring"
+source_url: "https://crates.io/crates/udev"
+source:
+  type: git
+  url: "https://github.com/nickel-org/libudev-rs"
+  branch: master

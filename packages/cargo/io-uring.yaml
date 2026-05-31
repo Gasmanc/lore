@@ -1,0 +1,9 @@
+name: io-uring
+registry: cargo
+version: "0.7.2"
+description: "Safe low-level bindings to Linux's io_uring interface"
+source_url: "https://crates.io/crates/io-uring"
+source:
+  type: git
+  url: "https://github.com/tokio-rs/io-uring"
+  branch: master

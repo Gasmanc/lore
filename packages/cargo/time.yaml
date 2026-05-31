@@ -1,0 +1,9 @@
+name: time
+registry: cargo
+version: "0.3.37"
+description: "Date and time library for Rust — formatting, parsing, arithmetic"
+source_url: "https://crates.io/crates/time"
+source:
+  type: git
+  url: "https://github.com/time-rs/time"
+  branch: main

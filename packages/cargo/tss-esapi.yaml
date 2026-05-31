@@ -1,0 +1,9 @@
+name: tss-esapi
+registry: cargo
+version: "8.0.0"
+description: "High-level Rust bindings for the TCG TSS 2.0 Enhanced System API (TPM2)"
+source_url: "https://crates.io/crates/tss-esapi"
+source:
+  type: git
+  url: "https://github.com/parallaxsecond/rust-tss-esapi"
+  branch: main

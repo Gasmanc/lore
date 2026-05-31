@@ -1,0 +1,9 @@
+name: recharts
+registry: npm
+version: "2.15.0"
+description: "Redefined chart library built with React and D3"
+source_url: "https://recharts.org/en-US/api"
+source:
+  type: git
+  url: "https://github.com/recharts/recharts.org"
+  branch: master

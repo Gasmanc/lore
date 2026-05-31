@@ -1,0 +1,10 @@
+name: openraft
+registry: cargo
+version: "0.9.18"
+description: "Advanced Raft consensus algorithm implementation in Rust"
+source_url: "https://crates.io/crates/openraft"
+source:
+  type: git
+  url: "https://github.com/datafuselabs/openraft"
+  branch: main
+  subdir: website

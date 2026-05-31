@@ -1,0 +1,10 @@
+name: typescript
+registry: npm
+version: "5.8.3"
+description: "TypeScript — a typed superset of JavaScript that compiles to plain JavaScript"
+source_url: "https://www.typescriptlang.org/docs/"
+source:
+  type: git
+  url: "https://github.com/microsoft/TypeScript-Website"
+  branch: v2
+  subdir: packages/documentation/copy/en

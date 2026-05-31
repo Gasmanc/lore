@@ -1,0 +1,9 @@
+name: async-trait
+registry: cargo
+version: "0.1.88"
+description: "Type erasure for async trait methods"
+source_url: "https://crates.io/crates/async-trait"
+source:
+  type: git
+  url: "https://github.com/dtolnay/async-trait"
+  branch: master

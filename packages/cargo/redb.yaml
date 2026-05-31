@@ -1,0 +1,9 @@
+name: redb
+registry: cargo
+version: "2.3.0"
+description: "Embedded ACID key-value store in pure Rust"
+source_url: "https://crates.io/crates/redb"
+source:
+  type: git
+  url: "https://github.com/cberner/redb"
+  branch: master

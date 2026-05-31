@@ -1,0 +1,9 @@
+name: memmap2
+registry: cargo
+version: "0.9.5"
+description: "Cross-platform Rust API for memory-mapped file I/O"
+source_url: "https://crates.io/crates/memmap2"
+source:
+  type: git
+  url: "https://github.com/RazrFalcon/memmap2-rs"
+  branch: master

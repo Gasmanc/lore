@@ -1,0 +1,10 @@
+name: age
+registry: cargo
+version: "0.10.0"
+description: "A simple, modern, and secure file encryption library"
+source_url: "https://crates.io/crates/age"
+source:
+  type: git
+  url: "https://github.com/str4d/rage"
+  branch: main
+  subdir: age

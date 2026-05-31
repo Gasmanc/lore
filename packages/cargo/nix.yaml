@@ -1,0 +1,9 @@
+name: nix
+registry: cargo
+version: "0.29.0"
+description: "Rust friendly bindings to *nix APIs"
+source_url: "https://crates.io/crates/nix"
+source:
+  type: git
+  url: "https://github.com/nix-rust/nix"
+  branch: master

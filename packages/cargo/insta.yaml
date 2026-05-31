@@ -1,0 +1,9 @@
+name: insta
+registry: cargo
+version: "1.42.2"
+description: "A snapshot testing library for Rust"
+source_url: "https://crates.io/crates/insta"
+source:
+  type: git
+  url: "https://github.com/mitsuhiko/insta"
+  branch: master

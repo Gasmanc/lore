@@ -1,0 +1,9 @@
+name: anyhow
+registry: cargo
+version: "1.0.95"
+description: "Flexible concrete Error type built on std::error::Error"
+source_url: "https://crates.io/crates/anyhow"
+source:
+  type: git
+  url: "https://github.com/dtolnay/anyhow"
+  branch: master

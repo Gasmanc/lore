@@ -1,0 +1,9 @@
+name: blake3
+registry: cargo
+version: "1.6.0"
+description: "The BLAKE3 cryptographic hash function"
+source_url: "https://crates.io/crates/blake3"
+source:
+  type: git
+  url: "https://github.com/BLAKE3-team/BLAKE3"
+  branch: master

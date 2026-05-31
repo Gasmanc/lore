@@ -1,0 +1,9 @@
+name: smallvec
+registry: cargo
+version: "1.13.2"
+description: "Inline array that falls back to heap allocation for larger sizes"
+source_url: "https://crates.io/crates/smallvec"
+source:
+  type: git
+  url: "https://github.com/servo/rust-smallvec"
+  branch: master

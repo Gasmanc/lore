@@ -1,0 +1,9 @@
+name: schemars
+registry: cargo
+version: "0.8.21"
+description: "Generate JSON Schema documents from Rust code"
+source_url: "https://crates.io/crates/schemars"
+source:
+  type: git
+  url: "https://github.com/GREsau/schemars"
+  branch: master

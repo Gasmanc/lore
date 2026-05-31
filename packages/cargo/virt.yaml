@@ -1,0 +1,9 @@
+name: virt
+registry: cargo
+version: "0.4.0"
+description: "Rust bindings to the libvirt virtualization API"
+source_url: "https://crates.io/crates/virt"
+source:
+  type: git
+  url: "https://gitlab.com/libvirt/libvirt-rust"
+  branch: master

@@ -1,0 +1,9 @@
+name: tempfile
+registry: cargo
+version: "3.14.0"
+description: "A library for managing temporary files and directories"
+source_url: "https://crates.io/crates/tempfile"
+source:
+  type: git
+  url: "https://github.com/Stebalien/tempfile"
+  branch: master

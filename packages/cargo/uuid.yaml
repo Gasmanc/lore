@@ -1,0 +1,9 @@
+name: uuid
+registry: cargo
+version: "1.11.0"
+description: "A library to generate and parse UUIDs"
+source_url: "https://crates.io/crates/uuid"
+source:
+  type: git
+  url: "https://github.com/uuid-rs/uuid"
+  branch: main

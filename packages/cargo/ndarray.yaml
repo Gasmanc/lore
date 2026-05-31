@@ -1,0 +1,9 @@
+name: ndarray
+registry: cargo
+version: "0.16.1"
+description: "An n-dimensional array for general elements and for numerics"
+source_url: "https://crates.io/crates/ndarray"
+source:
+  type: git
+  url: "https://github.com/rust-ndarray/ndarray"
+  branch: master

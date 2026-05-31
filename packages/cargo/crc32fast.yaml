@@ -1,0 +1,9 @@
+name: crc32fast
+registry: cargo
+version: "1.4.2"
+description: "Fast, SIMD-accelerated CRC32 (IEEE) checksum computation"
+source_url: "https://crates.io/crates/crc32fast"
+source:
+  type: git
+  url: "https://github.com/srijs/rust-crc32fast"
+  branch: master

@@ -1,0 +1,9 @@
+name: libc
+registry: cargo
+version: "0.2.170"
+description: "Raw FFI bindings to platform libraries like libc"
+source_url: "https://crates.io/crates/libc"
+source:
+  type: git
+  url: "https://github.com/rust-lang/libc"
+  branch: main

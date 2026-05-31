@@ -1,0 +1,10 @@
+name: proptest
+registry: cargo
+version: "1.6.0"
+description: "Hypothesis-like property testing for Rust"
+source_url: "https://crates.io/crates/proptest"
+source:
+  type: git
+  url: "https://github.com/proptest-rs/proptest"
+  branch: master
+  subdir: book/src

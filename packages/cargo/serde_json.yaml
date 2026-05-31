@@ -1,0 +1,9 @@
+name: serde_json
+registry: cargo
+version: "1.0.140"
+description: "A JSON serialization file format"
+source_url: "https://crates.io/crates/serde_json"
+source:
+  type: git
+  url: "https://github.com/serde-rs/json"
+  branch: master

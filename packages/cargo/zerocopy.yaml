@@ -1,0 +1,9 @@
+name: zerocopy
+registry: cargo
+version: "0.8.14"
+description: "Utilities for safe zero-copy parsing and serialization"
+source_url: "https://crates.io/crates/zerocopy"
+source:
+  type: git
+  url: "https://github.com/google/zerocopy"
+  branch: main

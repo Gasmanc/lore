@@ -1,0 +1,9 @@
+name: tower
+registry: cargo
+version: "0.5.2"
+description: "Tower is a library of modular and reusable components for building robust clients and servers"
+source_url: "https://crates.io/crates/tower"
+source:
+  type: git
+  url: "https://github.com/tower-rs/tower"
+  branch: master

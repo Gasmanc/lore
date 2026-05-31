@@ -1,0 +1,9 @@
+name: thiserror
+registry: cargo
+version: "2.0.12"
+description: "derive(Error) for struct and enum error types"
+source_url: "https://crates.io/crates/thiserror"
+source:
+  type: git
+  url: "https://github.com/dtolnay/thiserror"
+  branch: master

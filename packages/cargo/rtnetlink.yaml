@@ -1,0 +1,9 @@
+name: rtnetlink
+registry: cargo
+version: "0.14.1"
+description: "Async Rust implementation of the netlink rtnetlink protocol"
+source_url: "https://crates.io/crates/rtnetlink"
+source:
+  type: git
+  url: "https://github.com/rust-netlink/rtnetlink"
+  branch: main
