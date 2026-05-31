@@ -8,3 +8,5 @@ source:
   url: "https://github.com/flutter/website"
   branch: main
   subdir: sites/docs/src/content
+build:
+  exclude_examples: true
