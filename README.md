@@ -64,6 +64,24 @@ lore search tokio "spawn async task"
 lore mcp
 ```
 
+## MCP tools
+
+The `lore mcp` server exposes these tools to a coding agent:
+
+- **`search_docs`** — hybrid search of one package, with per-session
+  deduplication (`fresh_only`, default on) so repeated searches surface new
+  material instead of re-spending the token budget on already-seen chunks.
+- **`search_stack`** — federated search across *every* installed package that
+  matches the current project's declared dependencies (read from
+  `Cargo.toml` / `package.json` / `pyproject.toml`), ranked together. Removes
+  the need for the agent to know which library holds the answer.
+- **`resolve_package`** — map a bare name (`tokio`) to installed keys
+  (`cargo-tokio@1.44.2`).
+- **`stack_status`** — report which project dependencies have installed docs,
+  which are missing, and where the indexed version has drifted from the
+  declared one.
+- **`list_packages`**, **`get_manifest`**, **`get_node`**, **`reset_session`**.
+
 ## MCP configuration
 
 ### Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`)
@@ -98,13 +116,41 @@ lore mcp
 lore <SUBCOMMAND>
 
 Subcommands:
-  add     <package>          Install a package from the registry
-  remove  <package>          Remove an installed package
-  list                       List installed packages
-  search  <package> <query>  Search a package
-  build   <dir>              Build a package from a local source directory
-  mcp                        Start the MCP server on stdin/stdout
+  add        <package>          Install a package from the registry
+  remove     <package>          Remove an installed package
+  list                          List installed packages
+  search     <package> <query>  Search a package (--fast = keyword-only, no model load)
+  build      <dir>              Build a package from a local source directory
+  build-website <url>           Build from a live site (llms.txt digest or crawl)
+  build-rustdoc --crate <name>  Build from `cargo rustdoc` JSON (exact locked API)
+  update     [packages...]      Rebuild installed packages from their sources
+  diff       <old> <new>        Diff the API surface of two package versions
+  manifest   <package>          Print the compact API-surface manifest
+  info       <package>          Show package metadata and statistics
+  doctor     <package>          Report indexing + retrieval-quality health
+  check-updates                 Check installed packages against upstream registries
+  mcp                           Start the MCP server on stdin/stdout
 ```
+
+### rustdoc-JSON ingestion
+
+`lore build-rustdoc --crate tokio --version 1.44.2` runs
+`cargo +nightly rustdoc --output-format json` for a dependency and indexes the
+**exact locked version's** public API — every item, signature, and doc comment.
+Pass `--json <path>` instead to ingest a rustdoc JSON you already generated. This
+is the most version-precise source for Rust crates.
+
+### Version diffing
+
+`lore diff cargo-axum@0.7.9 cargo-axum@0.8.9` reports the API items added,
+removed, and changed between two installed versions — a breaking-change signal.
+Most precise on `build-rustdoc` packages.
+
+### Fast keyword search
+
+`lore search <pkg> <query> --fast` skips loading the embedding model entirely
+(BM25-only), turning a ~300 ms lookup into single-digit milliseconds — ideal for
+exact API-name queries. Omit `--fast` for hybrid semantic + keyword search.
 
 Run `lore help <subcommand>` for full flag documentation.
 

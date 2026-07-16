@@ -24,6 +24,7 @@ use crate::parser::ContentBlock;
 
 /// Size thresholds that govern how chunks are formed and refined.
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_field_names)] // the shared `_tokens` suffix is meaningful
 pub struct ChunkConfig {
     /// Prose chunks with fewer tokens than this are candidates for merging
     /// during semantic refinement.

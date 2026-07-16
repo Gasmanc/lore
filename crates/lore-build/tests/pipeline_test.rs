@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::pedantic, clippy::nursery)]
 //! Integration tests for the Phase 3/4/5.1 pipeline:
 //! token counting, structural chunking, semantic refinement,
 //! contextual embedding, and file discovery.

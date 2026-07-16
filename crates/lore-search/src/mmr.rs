@@ -174,7 +174,7 @@ mod tests {
         let mut embeddings = HashMap::new();
         embeddings.insert(1i64, emb.clone());
         embeddings.insert(2i64, emb.clone());
-        embeddings.insert(3i64, emb.clone());
+        embeddings.insert(3i64, emb);
 
         let candidates = vec![scored(1, 3.0), scored(2, 2.0), scored(3, 1.0)];
         let result = select(candidates, &embeddings, 0.5, 3);

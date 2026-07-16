@@ -1,10 +1,10 @@
 name: Build Registry
 
+# Manual-only: prefer the local `just build-registry` (scripts/build-registry.sh)
+# to avoid consuming Actions minutes. This workflow remains for the rare case a
+# cloud rebuild is wanted (it cannot build `website` sources — those need a local
+# crawl).
 on:
-  push:
-    branches: [main]
-    paths:
-      - "packages/**"
   workflow_dispatch:
     inputs:
       package:
@@ -97,7 +97,14 @@ jobs:
               subdir=$(yq -r '.source.subdir // ""' "$SPEC")
               clone_args=(--depth 1)
               [ -n "$branch" ] && clone_args+=(--branch "$branch")
-              git clone "${clone_args[@]}" "$url" _src
+              # `--` terminates option parsing so a URL beginning with `-`
+              # cannot be misread as a git flag (argument injection).
+              git clone "${clone_args[@]}" -- "$url" _src
+              # Reject a subdir that escapes the clone (defence in depth; the
+              # Rust spec loader validates this too).
+              case "$subdir" in
+                /*|*..*) echo "::error::unsafe source.subdir '$subdir'"; exit 1 ;;
+              esac
               src="_src${subdir:+/$subdir}"
               ./target/release/lore build "$src" "${build_args[@]}"
               ;;

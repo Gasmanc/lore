@@ -4,17 +4,23 @@
 //! directory.  The caller then hands that directory to [`PackageBuilder`] to
 //! run the standard parse → chunk → embed → index pipeline.
 //!
-//! Three sources ship out of the box:
+//! The sources that ship out of the box:
 //! - [`LocalSource`] — a directory already on disk (no-op materialisation).
 //! - [`GitSource`] — clone or update a git repository.
 //! - [`WebsiteSource`] — crawl a website and convert pages to Markdown.
+//! - [`LlmsTxtSource`] — fetch a site's `llms.txt` / `llms-full.txt` digest.
+//! - [`RustdocSource`] — ingest a crate's `rustdoc --output-format json`.
 
 mod git;
+mod llms_txt;
 mod local;
+mod rustdoc;
 mod website;
 
 pub use git::GitSource;
+pub use llms_txt::LlmsTxtSource;
 pub use local::LocalSource;
+pub use rustdoc::{RustdocInput, RustdocSource, rustdoc_json_to_markdown};
 pub use website::WebsiteSource;
 
 use std::path::PathBuf;

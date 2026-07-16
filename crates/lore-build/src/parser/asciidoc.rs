@@ -93,8 +93,8 @@ fn parse_asciidoc(content: &str) -> ParsedDoc {
         if let Some(heading) = parse_heading(line) {
             flush_paragraph!();
             pending_lang = None;
-            while !stack.is_empty() && stack.last().is_some_and(|n| n.level >= heading.level) {
-                let completed = stack.pop().unwrap();
+            while stack.last().is_some_and(|n| n.level >= heading.level) {
+                let Some(completed) = stack.pop() else { break };
                 current_node(&mut stack, &mut root).children.push(completed);
             }
             stack.push(heading);
@@ -152,9 +152,10 @@ fn parse_heading(line: &str) -> Option<HeadingNode> {
         return None;
     }
     // `==` (2 chars) → level 2, `===` (3 chars) → level 3, etc.
-    // Heading levels beyond 6 are unlikely but safe to allow.
+    // Clamp at 6 to satisfy the schema's level CHECK constraint (a deeper
+    // `=======` heading would otherwise fail the whole file's indexing).
     #[allow(clippy::cast_possible_truncation)]
-    let level = equals.len() as u8;
+    let level = (equals.len() as u8).min(6);
     Some(HeadingNode { level, title, ..HeadingNode::default() })
 }
 

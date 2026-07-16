@@ -38,7 +38,7 @@ pub(super) fn fetch_nodes_by_ids(
     if ids.is_empty() {
         return Ok(vec![]);
     }
-    let sql = format!("SELECT {NODE_COLUMNS} FROM nodes WHERE id IN ({})", placeholders_for(ids),);
+    let sql = format!("SELECT {NODE_COLUMNS} FROM nodes WHERE id IN ({})", placeholders_for(ids));
     let mut stmt = db.prepare(&sql)?;
     let mut nodes: Vec<Node> = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), node_from_row)?

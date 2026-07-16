@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 //! Search pipeline: FTS5 + vector → RRF → MMR → token budget.
 //!
 //! The entry point is [`search`].  The pipeline:
@@ -9,9 +10,6 @@
 //! 5. **MMR diversity** ([`mmr`]) — greedily select a diverse result set.
 //! 6. **Token budget** ([`budget`]) — stop once total tokens would be exceeded.
 //! 7. **Resolve** ([`resolve`]) — attach doc titles and heading breadcrumbs.
-
-#![deny(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
-#![allow(clippy::module_name_repetitions, clippy::missing_errors_doc, clippy::must_use_candidate)]
 
 mod budget;
 mod mmr;
@@ -47,38 +45,89 @@ pub async fn search(
     let fts_hits = db.fts_search(sanitize_fts_query(query), limit).await?;
     let vec_hits = db.vec_search(query_embedding.to_vec(), limit).await?;
 
-    let merged = rrf::merge(&[fts_hits, vec_hits]);
+    finish(db, vec![fts_hits, vec_hits], config).await
+}
+
+/// Keyword-only search: FTS5 BM25 without the semantic vector stage.
+///
+/// This skips query embedding entirely, so callers avoid loading the ~130 MB
+/// ONNX model — turning a ~300 ms `lore search` into a single-digit-millisecond
+/// lookup. MMR diversity still applies, using the chunk embeddings already
+/// stored in the database.
+///
+/// # Errors
+///
+/// Returns [`LoreError`] if any database operation fails.
+#[instrument(skip(db, config), fields(query = %query))]
+pub async fn search_keyword(
+    db: &Db,
+    query: &str,
+    config: &SearchConfig,
+) -> Result<Vec<SearchResult>, LoreError> {
+    let fts_hits = db.fts_search(sanitize_fts_query(query), config.candidate_limit).await?;
+    finish(db, vec![fts_hits], config).await
+}
+
+/// Shared tail of the search pipeline: RRF-fuse the candidate lists, apply the
+/// relevance threshold, diversify with MMR, enforce the token budget, and
+/// resolve doc titles + heading breadcrumbs.
+async fn finish(
+    db: &Db,
+    lists: Vec<Vec<ScoredNode>>,
+    config: &SearchConfig,
+) -> Result<Vec<SearchResult>, LoreError> {
+    let merged = rrf::merge(lists);
     if merged.is_empty() {
         return Ok(vec![]);
     }
 
+    // Min-max normalize the fused scores and drop the low tail. RRF scores are
+    // too compressed (and sensitive to 1-vs-2 list membership) to threshold as
+    // a raw fraction of the top; normalizing against the range fixes that.
     let top_score = merged[0].score;
-    let merged: Vec<_> =
-        merged.into_iter().filter(|n| n.score >= top_score * config.relevance_threshold).collect();
+    let bottom_score = merged.last().map_or(top_score, |n| n.score);
+    let range = top_score - bottom_score;
+    let merged: Vec<_> = if range <= f64::EPSILON {
+        // All candidates scored equally — nothing to discriminate on.
+        merged
+    } else {
+        merged
+            .into_iter()
+            .filter(|n| (n.score - bottom_score) / range >= config.relevance_threshold)
+            .collect()
+    };
 
     let node_ids: Vec<i64> = merged.iter().map(|n| n.node.id).collect();
     let embeddings: HashMap<i64, Vec<f32>> =
         db.get_embeddings_for_nodes(node_ids).await?.into_iter().collect();
 
-    let selected = mmr::select(merged, &embeddings, config.mmr_lambda, limit);
+    let selected = mmr::select(merged, &embeddings, config.mmr_lambda, config.candidate_limit);
     let selected = budget::apply(selected, config.token_budget);
     resolve::resolve(db, selected).await
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-/// Strips FTS5-special characters from a natural-language query so that it
-/// can be passed directly to `nodes_fts MATCH ?`.
+/// Converts a natural-language query into a safe FTS5 `MATCH` expression.
 ///
-/// Keeps alphanumeric characters, hyphens, and apostrophes.  Tokens shorter
-/// than two characters are dropped to avoid noise.  Returns an empty string
-/// if nothing survives (the caller treats that as "skip FTS5").
+/// Each run of alphanumerics, hyphens, and apostrophes becomes one token, and
+/// every token is wrapped in double quotes so FTS5 treats it as a literal
+/// phrase.  This is essential for the library-docs domain: bare terms like
+/// `async-std` or `sqlite-vec` are *not* valid FTS5 barewords (`-` parses as a
+/// column filter, uppercase `AND`/`OR`/`NOT` as operators, `'` as a syntax
+/// error), so an unquoted query errors out on exactly the identifiers users
+/// search for most. Quoting sidesteps all FTS5 operator syntax.
+///
+/// Embedded double quotes are escaped by doubling (FTS5's own escaping rule).
+/// Tokens shorter than two characters are dropped to avoid noise.  Returns an
+/// empty string if nothing survives (the caller treats that as "skip FTS5").
 fn sanitize_fts_query(query: &str) -> String {
-    let tokens: Vec<&str> = query
+    query
         .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '\'')
         .filter(|t| t.len() >= 2)
-        .collect();
-    tokens.join(" ")
+        .map(|t| format!("\"{}\"", t.replace('"', "\"\"")))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -89,17 +138,25 @@ mod tests {
 
     #[test]
     fn sanitize_strips_special_chars() {
-        assert_eq!(sanitize_fts_query("hello, world!"), "hello world");
+        assert_eq!(sanitize_fts_query("hello, world!"), "\"hello\" \"world\"");
     }
 
     #[test]
     fn sanitize_drops_short_tokens() {
-        assert_eq!(sanitize_fts_query("a b cd efg"), "cd efg");
+        assert_eq!(sanitize_fts_query("a b cd efg"), "\"cd\" \"efg\"");
     }
 
     #[test]
-    fn sanitize_preserves_hyphen_and_apostrophe() {
-        assert_eq!(sanitize_fts_query("don't use async-std"), "don't use async-std");
+    fn sanitize_quotes_hyphenated_and_apostrophe_tokens() {
+        // Each token is wrapped as a quoted FTS5 phrase so `-` / `'` never hit
+        // FTS5 operator parsing.
+        assert_eq!(sanitize_fts_query("don't use async-std"), "\"don't\" \"use\" \"async-std\"");
+    }
+
+    #[test]
+    fn sanitize_quotes_fts5_operators_as_literals() {
+        // Uppercase AND/OR/NOT and parens must not reach FTS5 as operators.
+        assert_eq!(sanitize_fts_query("OR NOT working"), "\"OR\" \"NOT\" \"working\"");
     }
 
     #[test]
@@ -115,8 +172,8 @@ mod tests {
     #[test]
     fn sanitize_cjk_characters_are_preserved() {
         // CJK chars are alphanumeric in Rust's char::is_alphanumeric(), so
-        // they pass through the sanitizer unchanged.
-        assert_eq!(sanitize_fts_query("日本語 検索"), "日本語 検索");
+        // they pass through the sanitizer (each token quoted).
+        assert_eq!(sanitize_fts_query("日本語 検索"), "\"日本語\" \"検索\"");
     }
 
     #[test]
@@ -129,7 +186,7 @@ mod tests {
     #[test]
     fn sanitize_single_char_tokens_are_dropped() {
         // Tokens shorter than 2 chars are filtered out.
-        assert_eq!(sanitize_fts_query("a b c hello"), "hello");
+        assert_eq!(sanitize_fts_query("a b c hello"), "\"hello\"");
     }
 
     #[test]

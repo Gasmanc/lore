@@ -5,11 +5,19 @@
 //! delegates to [`super::markdown::parse_markdown`].
 
 use std::path::Path;
+use std::sync::LazyLock;
 
 use lore_core::LoreError;
 use scraper::{Html, Selector};
 
 use super::{ParsedDoc, Parser, markdown::parse_markdown};
+
+/// `<title>` selector, compiled once. The literal is always a valid selector;
+/// storing it as `Option` lets us honour the no-unwrap policy and simply skip
+/// title extraction in the impossible case that compilation fails.
+static TITLE_SEL: LazyLock<Option<Selector>> = LazyLock::new(|| Selector::parse("title").ok());
+/// `<h1>` selector, compiled once (see [`TITLE_SEL`]).
+static H1_SEL: LazyLock<Option<Selector>> = LazyLock::new(|| Selector::parse("h1").ok());
 
 /// Parses `.html` and `.htm` files.
 pub struct HtmlParser;
@@ -51,16 +59,17 @@ impl Parser for HtmlParser {
 
 fn extract_title(document: &Html) -> Option<String> {
     // Try <title> element.
-    let title_sel = Selector::parse("title").unwrap();
-    if let Some(el) = document.select(&title_sel).next() {
-        let text = el.text().collect::<String>().trim().to_owned();
-        if !text.is_empty() {
-            return Some(text);
+    if let Some(sel) = TITLE_SEL.as_ref() {
+        if let Some(el) = document.select(sel).next() {
+            let text = el.text().collect::<String>().trim().to_owned();
+            if !text.is_empty() {
+                return Some(text);
+            }
         }
     }
     // Fall back to first <h1>.
-    let h1_sel = Selector::parse("h1").unwrap();
-    document.select(&h1_sel).next().map(|el| el.text().collect::<String>().trim().to_owned())
+    let sel = H1_SEL.as_ref()?;
+    document.select(sel).next().map(|el| el.text().collect::<String>().trim().to_owned())
 }
 
 /// Remove boilerplate tags by rebuilding the HTML without them.

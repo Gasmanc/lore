@@ -14,9 +14,17 @@ pub struct SearchConfig {
     /// and vector search stages before fusion.  Defaults to `20`.
     pub candidate_limit: usize,
 
-    /// Fraction of the top BM25 score below which candidates are discarded.
-    /// A value of `0.5` means only results within half a BM25 score of the
-    /// best match are kept.  Defaults to `0.5`.
+    /// Relevance cut-off applied to the fused (RRF) candidate list, expressed
+    /// as a fraction of the score *range* after min-max normalization: a
+    /// candidate is kept when `(score - min) / (max - min) >=
+    /// relevance_threshold`.  `0.0` keeps everything; `0.5` keeps the upper
+    /// half of the score range.  Defaults to `0.5`.
+    ///
+    /// Normalizing against the range (rather than an absolute fraction of the
+    /// top score) makes the cut-off behave consistently regardless of whether
+    /// the top hit happened to appear in one or both of the FTS/vector lists —
+    /// RRF's absolute scores are otherwise too compressed to threshold
+    /// meaningfully.
     pub relevance_threshold: f64,
 
     /// Maximum total token count across all returned results.  The pipeline

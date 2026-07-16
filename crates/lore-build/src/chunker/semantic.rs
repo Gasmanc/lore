@@ -62,7 +62,9 @@ impl SemanticRefiner {
             .collect();
 
         if paragraphs.len() < 3 {
-            return Ok(vec![chunk]);
+            // Too few paragraphs to find a semantic valley, but the chunk may
+            // still be a single enormous paragraph over the hard ceiling.
+            return Ok(hard_split(chunk, self.config.hard_max_tokens, &self.counter));
         }
 
         // Embed each paragraph (without breadcrumb — these are fragments,
@@ -77,7 +79,7 @@ impl SemanticRefiner {
         // Find split positions using the valley detection heuristic.
         let split_positions = valley_positions(&similarities);
         if split_positions.is_empty() {
-            return Ok(vec![chunk]);
+            return Ok(hard_split(chunk, self.config.hard_max_tokens, &self.counter));
         }
 
         // Build a list of segments (each segment is a contiguous slice of
@@ -87,8 +89,130 @@ impl SemanticRefiner {
         // Merge tiny segments (token_count < min_tokens).
         let merged = merge_tiny_segments(segments, self.config.min_tokens, &self.counter);
 
-        Ok(merged)
+        // Enforce the hard ceiling: semantic splitting can leave a segment (or a
+        // single enormous paragraph) above `hard_max_tokens`, which would then
+        // be silently truncated by the embedding model. Split any such chunk on
+        // paragraph → sentence → word boundaries as a last resort.
+        let capped = merged
+            .into_iter()
+            .flat_map(|c| hard_split(c, self.config.hard_max_tokens, &self.counter))
+            .collect();
+
+        Ok(capped)
     }
+}
+
+// ── Hard-cap enforcement ───────────────────────────────────────────────────────
+
+/// Splits a prose chunk whose `token_count` exceeds `hard_max` into pieces that
+/// each fit within it. Code chunks are left atomic (splitting them would break
+/// their meaning). Guarantees forward progress: a single word over budget is
+/// still emitted as its own piece rather than looping.
+fn hard_split(chunk: RawChunk, hard_max: u32, counter: &TokenCounter) -> Vec<RawChunk> {
+    if chunk.has_code || hard_max == 0 || chunk.token_count <= hard_max {
+        return vec![chunk];
+    }
+
+    // Flatten to text pieces, pre-splitting any single oversized paragraph.
+    let mut pieces: Vec<String> = Vec::new();
+    for block in &chunk.blocks {
+        let text = block.text();
+        if counter.count(text) <= hard_max {
+            pieces.push(text.to_owned());
+        } else {
+            pieces.extend(split_text_to_budget(text, hard_max, counter));
+        }
+    }
+
+    // Greedily pack pieces into chunks under the ceiling.
+    let mut out: Vec<RawChunk> = Vec::new();
+    let mut cur: Vec<ContentBlock> = Vec::new();
+    let mut cur_tokens: u32 = 0;
+    for piece in pieces {
+        let pt = counter.count(&piece);
+        if cur_tokens.saturating_add(pt) > hard_max && !cur.is_empty() {
+            out.push(finish_hard_chunk(&chunk, std::mem::take(&mut cur), cur_tokens));
+            cur_tokens = 0;
+        }
+        cur.push(ContentBlock::Paragraph(piece));
+        cur_tokens = cur_tokens.saturating_add(pt);
+    }
+    if !cur.is_empty() {
+        out.push(finish_hard_chunk(&chunk, cur, cur_tokens));
+    }
+    if out.is_empty() { vec![chunk] } else { out }
+}
+
+/// Build one hard-split output chunk carrying the original chunk's metadata.
+fn finish_hard_chunk(original: &RawChunk, blocks: Vec<ContentBlock>, token_count: u32) -> RawChunk {
+    RawChunk {
+        heading_path: original.heading_path.clone(),
+        heading_levels: original.heading_levels.clone(),
+        blocks,
+        token_count,
+        has_code: false,
+        needs_refinement: false,
+        doc_path: original.doc_path.clone(),
+        doc_title: original.doc_title.clone(),
+        kind: NodeKind::Chunk,
+    }
+}
+
+/// Split a single oversized text into fragments under `budget` tokens, breaking
+/// on sentence boundaries first, then whitespace.
+fn split_text_to_budget(text: &str, budget: u32, counter: &TokenCounter) -> Vec<String> {
+    // Sentence-ish units keep semantically related text together.
+    let units: Vec<&str> = text.split_inclusive(['.', '!', '?', '\n']).collect();
+    let mut out: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut cur_tokens: u32 = 0;
+
+    for unit in units {
+        let ut = counter.count(unit);
+        if ut > budget {
+            // A single sentence still too big — flush, then split on whitespace.
+            if !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
+                cur_tokens = 0;
+            }
+            out.extend(split_on_whitespace(unit, budget, counter));
+        } else {
+            if cur_tokens.saturating_add(ut) > budget && !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
+                cur_tokens = 0;
+            }
+            cur.push_str(unit);
+            cur_tokens = cur_tokens.saturating_add(ut);
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/// Last-resort split of a very long run on whitespace, packing words up to
+/// `budget` tokens. A single word over budget is emitted alone.
+fn split_on_whitespace(text: &str, budget: u32, counter: &TokenCounter) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut cur_tokens: u32 = 0;
+    for word in text.split_whitespace() {
+        let wt = counter.count(word);
+        if cur_tokens.saturating_add(wt) > budget && !cur.is_empty() {
+            out.push(std::mem::take(&mut cur));
+            cur_tokens = 0;
+        }
+        if !cur.is_empty() {
+            cur.push(' ');
+        }
+        cur.push_str(word);
+        cur_tokens = cur_tokens.saturating_add(wt);
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
 }
 
 // ── Valley detection ──────────────────────────────────────────────────────────
@@ -227,6 +351,51 @@ mod tests {
             ChunkConfig::default(),
             TokenCounter::new().expect("tokenizer must init"),
         )
+    }
+
+    #[test]
+    fn hard_split_bounds_a_single_huge_paragraph() {
+        let counter = TokenCounter::new().expect("tokenizer must init");
+        // ~4000 tokens of one paragraph, no blank lines → no semantic split possible.
+        let huge = "lorem ipsum dolor sit amet. ".repeat(800);
+        let tokens = counter.count(&huge);
+        assert!(tokens > 1200, "test precondition: {tokens} tokens");
+        let chunk = RawChunk {
+            heading_path: vec!["Section".into()],
+            heading_levels: vec![2],
+            blocks: vec![ContentBlock::Paragraph(huge)],
+            token_count: tokens,
+            has_code: false,
+            needs_refinement: true,
+            doc_path: "d.md".into(),
+            doc_title: Some("D".into()),
+            kind: NodeKind::Chunk,
+        };
+        let pieces = hard_split(chunk, 1200, &counter);
+        assert!(pieces.len() > 1, "oversized paragraph must be split");
+        assert!(
+            pieces.iter().all(|p| p.token_count <= 1200),
+            "every piece must be within the hard cap: {:?}",
+            pieces.iter().map(|p| p.token_count).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn hard_split_leaves_code_chunks_atomic() {
+        let counter = TokenCounter::new().expect("tokenizer must init");
+        let big_code = "x".repeat(10_000);
+        let chunk = RawChunk {
+            heading_path: vec![],
+            heading_levels: vec![],
+            blocks: vec![ContentBlock::Code { lang: None, content: big_code }],
+            token_count: 5000,
+            has_code: true,
+            needs_refinement: false,
+            doc_path: "d.md".into(),
+            doc_title: None,
+            kind: NodeKind::CodeBlock,
+        };
+        assert_eq!(hard_split(chunk, 1200, &counter).len(), 1, "code stays atomic");
     }
 
     /// Shared embedder — initialised at most once per test binary execution.

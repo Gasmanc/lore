@@ -135,7 +135,7 @@ impl PackageBuilder {
         info!(count = files.len(), "discovered documentation files");
 
         // Build the indexer once and reuse it for all files.
-        let indexer = self.make_indexer(db.clone());
+        let indexer = self.make_indexer(db.clone())?;
 
         let mut stats = BuildStats::default();
 
@@ -162,6 +162,10 @@ impl PackageBuilder {
         // Compact and tune the database.
         db.optimize().await?;
 
+        // Merge the WAL into the main file so the `.db` is self-contained and
+        // safe to atomically rename into place (callers build to a temp path).
+        db.checkpoint().await?;
+
         stats.duration = start.elapsed();
         info!(summary = %stats.summary(), "build complete");
         Ok(stats)
@@ -185,15 +189,15 @@ impl PackageBuilder {
         Ok(())
     }
 
-    fn make_indexer(&self, db: Db) -> Indexer {
+    fn make_indexer(&self, db: Db) -> Result<Indexer, LoreError> {
         let config = self.config.clone();
-        Indexer::new(
+        Ok(Indexer::new(
             ParserRegistry::new(),
-            StructuralChunker::new(config.clone(), TokenCounter::new().expect("tokenizer")),
-            SemanticRefiner::new(config, TokenCounter::new().expect("tokenizer")),
+            StructuralChunker::new(config.clone(), TokenCounter::new()?),
+            SemanticRefiner::new(config, TokenCounter::new()?),
             self.embedder.clone(),
             db,
-        )
+        ))
     }
 
     /// Reads a file, runs the indexer, and updates build stats.

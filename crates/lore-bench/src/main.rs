@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 //! Retrieval quality benchmark for the Lore search pipeline.
 //!
 //! Builds a 20-document synthetic corpus, runs 20 natural-language queries
@@ -12,9 +13,6 @@
 //!
 //! The embedding model (~130 MB) is downloaded on first run and cached.
 //! Subsequent runs reuse the cache and complete in under 30 seconds.
-
-#![warn(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
-#![allow(clippy::missing_errors_doc)]
 
 mod corpus;
 mod mrr;

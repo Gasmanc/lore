@@ -22,7 +22,6 @@ walkdir        = { workspace = true }
 tokio          = { workspace = true }
 git2           = { workspace = true }
 reqwest        = { workspace = true }
-md5            = { workspace = true }
 
 dirs-next = { workspace = true }
 tempfile  = { workspace = true }
@@ -30,3 +29,6 @@ tempfile  = { workspace = true }
 [dev-dependencies]
 tempfile  = { workspace = true }
 tokio     = { workspace = true }
+
+[lints]
+workspace = true

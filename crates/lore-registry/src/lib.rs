@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 //! Registry API client, package download, and YAML spec loading for Lore.
 //!
 //! [`RegistryClient`] fetches the package index from a remote registry,
@@ -12,9 +13,6 @@
 //!
 //! The `display_key` is `"{registry}-{name}@{version}"`, matching
 //! [`lore_core::Package::display_key`].
-
-#![deny(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
-#![allow(clippy::module_name_repetitions, clippy::missing_errors_doc, clippy::must_use_candidate)]
 
 pub mod spec;
 pub use spec::{BuildOptions, PackageSpec, SourceSpec, load_all_specs, load_spec};
@@ -47,6 +45,11 @@ pub struct RegistryClient {
     base_url: String,
     http: reqwest::Client,
 }
+
+/// Hard ceiling on a downloaded package `.db`.  A compromised or misconfigured
+/// registry must not be able to exhaust the user's disk; 512 MB is far above
+/// any legitimate documentation database.
+const MAX_PACKAGE_BYTES: u64 = 512 * 1024 * 1024;
 
 impl RegistryClient {
     /// The default public registry URL.
@@ -132,11 +135,21 @@ impl RegistryClient {
         let mut file = tokio::io::BufWriter::new(file);
 
         let mut stream = resp.bytes_stream();
+        let mut written: u64 = 0;
         while let Some(chunk) = stream.next().await {
             let bytes = chunk.map_err(|e| LoreError::Registry(e.to_string()))?;
+            written = written.saturating_add(bytes.len() as u64);
+            if written > MAX_PACKAGE_BYTES {
+                // Best-effort cleanup of the partial download before aborting.
+                drop(file);
+                let _ = tokio::fs::remove_file(&tmp_path).await;
+                return Err(LoreError::Registry(format!(
+                    "package exceeds maximum size of {} MB — refusing to download",
+                    MAX_PACKAGE_BYTES / (1024 * 1024)
+                )));
+            }
             tokio::io::AsyncWriteExt::write_all(&mut file, &bytes).await.map_err(LoreError::Io)?;
             if let Some(pb) = progress {
-                #[allow(clippy::cast_possible_truncation)]
                 pb.inc(bytes.len() as u64);
             }
         }
@@ -155,7 +168,7 @@ impl RegistryClient {
 
 // ── Upstream version checks ───────────────────────────────────────────────────
 
-/// Query the upstream package registry (crates.io, npm, PyPI) for the latest
+/// Query the upstream package registry (crates.io, npm, `PyPI`) for the latest
 /// stable version of `name`.
 ///
 /// Returns `Ok(None)` for registries we don't know how to query.
@@ -213,10 +226,11 @@ pub fn default_http_client() -> Result<reqwest::Client, LoreError> {
 // ── Private helpers ────────────────────────────────────────────────────────────
 
 fn download_style() -> ProgressStyle {
+    // Fall back to the default bar if the (compile-time-constant) template ever
+    // fails to parse — a progress bar is cosmetic and must never abort a download.
     ProgressStyle::default_bar()
         .template("{spinner:.cyan} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-        .expect("valid template")
-        .progress_chars("=>-")
+        .map_or_else(|_| ProgressStyle::default_bar(), |s| s.progress_chars("=>-"))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

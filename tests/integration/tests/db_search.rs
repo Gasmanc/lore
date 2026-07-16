@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::pedantic, clippy::nursery)]
 //! Integration tests for the DB + FTS search pipeline.
 //!
 //! These tests exercise the full path from node insertion through FTS indexing

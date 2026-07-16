@@ -1,9 +1,10 @@
 name: CI
 
+# Manual-only: the local `just check` gate is the primary CI to avoid consuming
+# GitHub Actions minutes. Run this from the Actions tab when a cloud check is
+# explicitly wanted (e.g. before a release).
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always

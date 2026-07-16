@@ -7,6 +7,7 @@
 
 use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use lore_core::LoreError;
 use reqwest::Url;
@@ -17,6 +18,11 @@ use super::{PreparedSource, Source};
 
 /// The default maximum number of pages to crawl.
 const DEFAULT_MAX_PAGES: usize = 500;
+
+/// `a[href]` selector, compiled once. The literal is always valid; storing it
+/// as `Option` honours the no-unwrap policy (a crawl with no link selector
+/// simply follows no links).
+static LINK_SEL: LazyLock<Option<Selector>> = LazyLock::new(|| Selector::parse("a[href]").ok());
 
 /// A documentation source that crawls a live website.
 ///
@@ -71,7 +77,6 @@ async fn crawl(
     max_pages: usize,
     out_dir: PathBuf,
 ) -> Result<(), LoreError> {
-    let link_selector = Selector::parse("a[href]").expect("valid selector");
     let host = root.host_str().unwrap_or("").to_owned();
 
     let mut queue: VecDeque<Url> = VecDeque::new();
@@ -106,8 +111,9 @@ async fn crawl(
         tokio::fs::write(&path, markdown.as_bytes()).await.map_err(LoreError::Io)?;
 
         // Enqueue links on the same host.
+        let Some(link_selector) = LINK_SEL.as_ref() else { continue };
         let doc = Html::parse_document(&html);
-        for link_el in doc.select(&link_selector) {
+        for link_el in doc.select(link_selector) {
             if let Some(href) = link_el.value().attr("href") {
                 if let Ok(abs) = url.join(href) {
                     if abs.host_str() == Some(host.as_str()) && should_crawl(&abs) {

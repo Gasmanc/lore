@@ -142,16 +142,18 @@ fn parse_rst(content: &str) -> ParsedDoc {
                     },
                     |pos| pos + 1,
                 );
-                // Heading levels beyond 6 are uncommon but technically valid RST.
+                // RST allows arbitrarily deep heading nesting, but the schema
+                // (and Markdown/HTML) cap at 6 — clamp so a deeply nested doc
+                // indexes instead of failing the level CHECK constraint.
                 #[allow(clippy::cast_possible_truncation)]
-                let level = level as u8;
+                let level = (level as u8).min(6);
                 let heading = HeadingNode {
                     level,
                     title: candidate.trim().to_owned(),
                     ..HeadingNode::default()
                 };
-                while !stack.is_empty() && stack.last().is_some_and(|n| n.level >= level) {
-                    let completed = stack.pop().unwrap();
+                while stack.last().is_some_and(|n| n.level >= level) {
+                    let Some(completed) = stack.pop() else { break };
                     current_node(&mut stack, &mut root).children.push(completed);
                 }
                 stack.push(heading);

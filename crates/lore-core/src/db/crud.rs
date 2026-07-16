@@ -17,6 +17,22 @@ use super::{
     },
 };
 
+/// Validates a savepoint identifier before it is interpolated into SQL.
+///
+/// `SQLite` has no bind syntax for identifiers, so savepoint names must be
+/// interpolated — which makes an unrestricted `String` a latent injection
+/// vector on this `pub` API.  Restricting names to `[A-Za-z0-9_]+` closes it
+/// while permitting every internal identifier the crate actually uses.
+fn validate_savepoint_name(name: &str) -> Result<(), LoreError> {
+    if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        Ok(())
+    } else {
+        Err(LoreError::InvalidConfig(format!(
+            "savepoint name '{name}' must be non-empty and match [A-Za-z0-9_]+"
+        )))
+    }
+}
+
 impl Db {
     // -----------------------------------------------------------------------
     // Meta table helpers
@@ -259,9 +275,13 @@ impl Db {
         self.conn
             .call(move |db| {
                 let blob = f32_slice_to_bytes(&embedding);
+                // sqlite-vec's vec0 virtual table does not implement REPLACE
+                // conflict resolution, so `INSERT OR REPLACE` errors on an
+                // existing rowid. Delete any prior row first to make this a
+                // genuine upsert (required by incremental re-embedding).
+                db.execute("DELETE FROM node_embeddings WHERE rowid = ?1", params![node_id])?;
                 db.execute(
-                    "INSERT OR REPLACE INTO node_embeddings(rowid, embedding)
-                     VALUES (?1, ?2)",
+                    "INSERT INTO node_embeddings(rowid, embedding) VALUES (?1, ?2)",
                     params![node_id, blob],
                 )?;
                 Ok(())
@@ -388,6 +408,7 @@ impl Db {
     /// Pair with [`Db::release_savepoint`] on success or
     /// [`Db::rollback_savepoint`] on failure.
     pub async fn begin_savepoint(&self, name: String) -> Result<(), LoreError> {
+        validate_savepoint_name(&name)?;
         self.conn
             .call(move |db| db.execute_batch(&format!("SAVEPOINT \"{name}\"")))
             .await
@@ -398,6 +419,7 @@ impl Db {
     /// `name`, making the changes permanent (or visible to any outer
     /// transaction).
     pub async fn release_savepoint(&self, name: String) -> Result<(), LoreError> {
+        validate_savepoint_name(&name)?;
         self.conn
             .call(move |db| db.execute_batch(&format!("RELEASE \"{name}\"")))
             .await
@@ -407,6 +429,7 @@ impl Db {
     /// Rolls back all work done since [`Db::begin_savepoint`] was called with
     /// `name`, then releases the savepoint so it can be reused.
     pub async fn rollback_savepoint(&self, name: String) -> Result<(), LoreError> {
+        validate_savepoint_name(&name)?;
         self.conn
             .call(move |db| {
                 db.execute_batch(&format!("ROLLBACK TO SAVEPOINT \"{name}\"; RELEASE \"{name}\""))
@@ -424,6 +447,20 @@ impl Db {
     pub async fn optimize(&self) -> Result<(), LoreError> {
         self.conn
             .call(|db| db.execute_batch("PRAGMA optimize; VACUUM;"))
+            .await
+            .map_err(LoreError::from)
+    }
+
+    /// Checkpoints the write-ahead log into the main database file and truncates
+    /// it, so the `.db` file is fully self-contained.
+    ///
+    /// This MUST be called before a freshly built database is atomically
+    /// renamed into place: in WAL mode the most recent writes live in the
+    /// `-wal` sidecar, and renaming only the `.db` would orphan them, yielding
+    /// an apparently-empty package.
+    pub async fn checkpoint(&self) -> Result<(), LoreError> {
+        self.conn
+            .call(|db| db.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);"))
             .await
             .map_err(LoreError::from)
     }

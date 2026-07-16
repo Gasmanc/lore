@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::pedantic, clippy::nursery)]
 //! Integration tests for the full build pipeline.
 //!
 //! Tests that require the bge-small-en-v1.5 embedding model (~130 MB) are

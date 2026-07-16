@@ -89,7 +89,67 @@ pub struct BuildOptions {
 /// [`LoreError::Schema`] if the YAML is malformed.
 pub fn load_spec(path: &Path) -> Result<PackageSpec, LoreError> {
     let yaml = std::fs::read_to_string(path).map_err(LoreError::Io)?;
-    serde_yaml::from_str(&yaml).map_err(|e| LoreError::Schema(e.to_string()))
+    let spec: PackageSpec =
+        serde_yaml::from_str(&yaml).map_err(|e| LoreError::Schema(e.to_string()))?;
+    spec.validate()?;
+    Ok(spec)
+}
+
+impl PackageSpec {
+    /// Validates the fields that get turned into filesystem paths or shell/git
+    /// arguments downstream.
+    ///
+    /// This is the single home for spec-field safety: a `subdir` must stay
+    /// inside the cloned repo, and a git/website `url` must use an expected
+    /// scheme (so it cannot be misparsed as a `git` option — the classic
+    /// argument-injection vector).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LoreError::InvalidConfig`] on the first unsafe field.
+    pub fn validate(&self) -> Result<(), LoreError> {
+        match &self.source {
+            SourceSpec::Git { url, subdir, .. } => {
+                validate_source_url(url)?;
+                if let Some(sub) = subdir {
+                    validate_subdir(sub)?;
+                }
+            }
+            SourceSpec::Website { url, .. } => validate_source_url(url)?,
+            SourceSpec::Local { .. } => {}
+        }
+        Ok(())
+    }
+}
+
+/// Rejects a `subdir` that could escape the cloned repository root.
+fn validate_subdir(subdir: &str) -> Result<(), LoreError> {
+    let p = Path::new(subdir);
+    if p.is_absolute()
+        || subdir.contains("..")
+        || p.components().any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(LoreError::InvalidConfig(format!(
+            "source.subdir '{subdir}' must be a relative path inside the repository"
+        )));
+    }
+    Ok(())
+}
+
+/// Requires a source URL to use an expected scheme, so it can never be
+/// misinterpreted as a command-line option by downstream git tooling.
+fn validate_source_url(url: &str) -> Result<(), LoreError> {
+    let ok = url.starts_with("https://")
+        || url.starts_with("http://")
+        || url.starts_with("git://")
+        || url.starts_with("git@");
+    if ok {
+        Ok(())
+    } else {
+        Err(LoreError::InvalidConfig(format!(
+            "source url '{url}' must start with https://, http://, git://, or git@"
+        )))
+    }
 }
 
 /// Walk `specs_dir` and load all `*.yaml` files as package specs.
@@ -163,5 +223,42 @@ source:
         let spec: PackageSpec = serde_yaml::from_str(WEBSITE_YAML).unwrap();
         assert_eq!(spec.name, "tokio");
         assert!(matches!(spec.source, SourceSpec::Website { max_pages: Some(200), .. }));
+    }
+
+    #[test]
+    fn valid_specs_pass_validation() {
+        for yaml in [GIT_YAML, WEBSITE_YAML] {
+            let spec: PackageSpec = serde_yaml::from_str(yaml).unwrap();
+            assert!(spec.validate().is_ok());
+        }
+    }
+
+    #[test]
+    fn rejects_subdir_traversal() {
+        let yaml = r#"
+name: x
+registry: cargo
+version: "1"
+source:
+  type: git
+  url: "https://github.com/x/y"
+  subdir: "../../../etc"
+"#;
+        let spec: PackageSpec = serde_yaml::from_str(yaml).unwrap();
+        assert!(spec.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_option_like_url() {
+        let yaml = r#"
+name: x
+registry: cargo
+version: "1"
+source:
+  type: git
+  url: "--upload-pack=touch /tmp/pwned"
+"#;
+        let spec: PackageSpec = serde_yaml::from_str(yaml).unwrap();
+        assert!(spec.validate().is_err());
     }
 }

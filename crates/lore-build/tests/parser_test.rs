@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::pedantic, clippy::nursery)]
 //! Integration tests for the lore-build parser module.
 
 use lore_build::{

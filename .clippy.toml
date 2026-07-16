@@ -1,1 +1,8 @@
 msrv = "1.85.0"
+avoid-breaking-exported-api = false
+
+# Unwrap/expect are fine in tests; forbid them in production paths.
+# Enforcement lives in `[workspace.lints]` (`unwrap_used`/`expect_used`/`panic`
+# = deny), which — unlike `disallowed-methods` — honours these test exemptions.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

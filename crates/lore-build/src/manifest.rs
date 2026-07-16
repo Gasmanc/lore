@@ -228,7 +228,14 @@ fn extract_compact_sig(rest: &str) -> String {
     // Take up to the first `{` or `;`.
     let end = rest.find(['{', ';']).unwrap_or(rest.len());
     let sig = rest[..end].trim().to_owned();
-    if sig.len() > 60 { format!("{}…", &sig[..57]) } else { sig }
+    if sig.len() > 60 {
+        // Truncate on a UTF-8 char boundary at or before byte 57 — slicing on a
+        // raw byte index panics when a multibyte char (é, →, CJK) straddles it.
+        let boundary = (0..=57).rev().find(|&i| sig.is_char_boundary(i)).unwrap_or(0);
+        format!("{}…", &sig[..boundary])
+    } else {
+        sig
+    }
 }
 
 // ── Manifest formatting ───────────────────────────────────────────────────────

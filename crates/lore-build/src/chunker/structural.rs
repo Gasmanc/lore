@@ -97,66 +97,65 @@ fn walk(
     // Headings deeper than primary_level fold their content into the parent
     // chunk instead of creating a new boundary.  The root node (level 0) and
     // headings at or above primary_level always emit their own chunks.
-    // If there is no parent chunk to fold into, a new chunk is created anyway.
-    let can_fold = node.level > primary_level && parent_chunk_idx.is_some();
-
     // Partition blocks: code goes to atomic chunks, prose accumulates.
     let (code_blocks, prose_blocks): (Vec<ContentBlock>, Vec<ContentBlock>) =
         node.blocks.iter().cloned().partition(|b| matches!(b, ContentBlock::Code { .. }));
 
     // ── Prose chunk ────────────────────────────────────────────────────────
-    let prose_idx: Option<usize> = if can_fold {
-        // Fold: append blocks to the parent chunk instead of creating a new one.
-        // The child heading's title is injected as a paragraph so it remains
-        // searchable, and the heading is recorded in `folded_headings` so the
-        // indexer still creates a structural heading node in the database.
-        let parent_idx = parent_chunk_idx.expect("checked by can_fold");
+    // `can_fold` implies `parent_chunk_idx.is_some()`; binding it here (rather
+    // than re-asserting with expect) keeps the check and the use in one place.
+    let prose_idx: Option<usize> =
+        if let (true, Some(parent_idx)) = (node.level > primary_level, parent_chunk_idx) {
+            // Fold: append blocks to the parent chunk instead of creating a new one.
+            // The child heading's title is injected as a paragraph so it remains
+            // searchable, and the heading is recorded in `folded_headings` so the
+            // indexer still creates a structural heading node in the database.
 
-        // Record this heading for the indexer to materialise as a DB node,
-        // but only if it has a meaningful title.
-        if !node.title.trim().is_empty() {
-            tree.folded_headings.push(FoldedHeading::new(path.clone(), levels.clone()));
-        }
+            // Record this heading for the indexer to materialise as a DB node,
+            // but only if it has a meaningful title.
+            if !node.title.trim().is_empty() {
+                tree.folded_headings.push(FoldedHeading::new(path.clone(), levels.clone()));
+            }
 
-        let (parent_chunk, _) = &mut tree.nodes[parent_idx];
+            let (parent_chunk, _) = &mut tree.nodes[parent_idx];
 
-        // Inject the folded heading title as inline context.
-        if !node.title.trim().is_empty() {
-            parent_chunk.blocks.push(ContentBlock::Paragraph(node.title.clone()));
-        }
-        parent_chunk.blocks.extend(prose_blocks);
+            // Inject the folded heading title as inline context.
+            if !node.title.trim().is_empty() {
+                parent_chunk.blocks.push(ContentBlock::Paragraph(node.title.clone()));
+            }
+            parent_chunk.blocks.extend(prose_blocks);
 
-        // Re-count tokens after merge.
-        let text: String =
-            parent_chunk.blocks.iter().map(ContentBlock::text).collect::<Vec<_>>().join("\n\n");
-        parent_chunk.token_count = counter.count(&text);
-        parent_chunk.needs_refinement = parent_chunk.token_count > config.soft_max_tokens;
+            // Re-count tokens after merge.
+            let text: String =
+                parent_chunk.blocks.iter().map(ContentBlock::text).collect::<Vec<_>>().join("\n\n");
+            parent_chunk.token_count = counter.count(&text);
+            parent_chunk.needs_refinement = parent_chunk.token_count > config.soft_max_tokens;
 
-        // Return parent as the effective chunk for children.
-        parent_chunk_idx
-    } else if prose_blocks.is_empty() {
-        // No prose content at this level — pass the parent down unchanged so
-        // child chunks are still properly linked.
-        parent_chunk_idx
-    } else {
-        let text: String =
-            prose_blocks.iter().map(ContentBlock::text).collect::<Vec<_>>().join("\n\n");
-        let token_count = counter.count(&text);
-        let needs_refinement = token_count > config.soft_max_tokens;
+            // Return parent as the effective chunk for children.
+            parent_chunk_idx
+        } else if prose_blocks.is_empty() {
+            // No prose content at this level — pass the parent down unchanged so
+            // child chunks are still properly linked.
+            parent_chunk_idx
+        } else {
+            let text: String =
+                prose_blocks.iter().map(ContentBlock::text).collect::<Vec<_>>().join("\n\n");
+            let token_count = counter.count(&text);
+            let needs_refinement = token_count > config.soft_max_tokens;
 
-        let chunk = RawChunk {
-            heading_path: path.clone(),
-            heading_levels: levels.clone(),
-            blocks: prose_blocks,
-            token_count,
-            has_code: false,
-            needs_refinement,
-            doc_path: doc_path.to_owned(),
-            doc_title: doc_title.map(str::to_owned),
-            kind: NodeKind::Chunk,
+            let chunk = RawChunk {
+                heading_path: path.clone(),
+                heading_levels: levels.clone(),
+                blocks: prose_blocks,
+                token_count,
+                has_code: false,
+                needs_refinement,
+                doc_path: doc_path.to_owned(),
+                doc_title: doc_title.map(str::to_owned),
+                kind: NodeKind::Chunk,
+            };
+            Some(tree.push(chunk, parent_chunk_idx))
         };
-        Some(tree.push(chunk, parent_chunk_idx))
-    };
 
     // ── Code chunks (always atomic, always siblings of the prose chunk) ────
     for block in code_blocks {

@@ -9,6 +9,30 @@ authors     = ["Lore Contributors"]
 license     = "MIT"
 repository  = "https://github.com/Gasmanc/lore"
 
+# Single authoritative home for lint policy. Every crate opts in with
+# `[lints] workspace = true`; there are no per-crate `#![deny(...)]` attributes.
+# `just check` runs clippy with `-D warnings`, so `warn` levels are hard gates.
+[workspace.lints.clippy]
+unwrap_used   = "deny"
+expect_used   = "deny"
+panic         = "deny"
+todo          = "deny"
+unimplemented = "deny"
+dbg_macro     = "deny"
+pedantic = { level = "warn", priority = -1 }
+nursery  = { level = "warn", priority = -1 }
+# Intentional patterns / too aggressive for this codebase.
+module_name_repetitions = "allow"
+must_use_candidate      = "allow"
+missing_errors_doc      = "allow"
+# lore is a CLI — writing to stdout/stderr is the product, not a smell.
+print_stdout = "allow"
+print_stderr = "allow"
+
+[workspace.lints.rust]
+unsafe_code  = "deny"
+missing_docs = "warn"
+
 [workspace.dependencies]
 # Core async / error handling
 tokio         = { version = "1.51", features = ["full"] }
@@ -20,6 +44,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde         = { version = "1.0", features = ["derive"] }
 serde_json    = "1.0"
 serde_yaml    = "0.9"
+toml          = "0.8"
 
 # Database
 rusqlite      = { version = "0.37", features = ["bundled"] }
@@ -45,7 +70,6 @@ htmd           = "0.2"
 git2           = { version = "0.20", default-features = false, features = ["https", "vendored-openssl"] }
 walkdir        = "2"
 tempfile       = "3"
-md5            = "0.7"
 dirs-next      = "2"
 
 # Embeddings / tokens

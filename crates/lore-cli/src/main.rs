@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 //! `lore` command-line interface.
 //!
 //! Subcommands:
@@ -17,7 +18,7 @@ use clap::{Parser, Subcommand};
 use console::style;
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
-use lore_core::{LoreError, Package};
+use lore_core::{LoreError, Package, validate_package_key};
 use lore_registry::RegistryClient;
 
 /// Maximum number of content characters shown in a search result preview.
@@ -62,6 +63,10 @@ enum Command {
         /// Maximum tokens to include in results.
         #[arg(long, default_value = "2000")]
         budget: u32,
+        /// Keyword-only (BM25) search — skips loading the embedding model for a
+        /// ~300 ms → single-digit-ms lookup. Best for exact API-name queries.
+        #[arg(long)]
+        fast: bool,
     },
     /// Build a package from a local source directory.
     Build {
@@ -89,6 +94,74 @@ enum Command {
         /// Exclude `examples/`, `tests/`, and similar directories.
         #[arg(long)]
         exclude_examples: bool,
+    },
+    /// Build a package from a live website (`llms.txt` digest or a crawl).
+    ///
+    /// By default tries the site's `llms-full.txt` / `llms.txt` first (clean,
+    /// LLM-ready Markdown) and falls back to crawling HTML pages. Pass
+    /// `--crawl` to force a crawl.
+    BuildWebsite {
+        /// Site URL (root, or a direct `llms.txt` link).
+        url: String,
+        /// Package name.
+        #[arg(long)]
+        name: String,
+        /// Package version.
+        #[arg(long)]
+        version: String,
+        /// Registry identifier. Defaults to `web`.
+        #[arg(long, default_value = "web")]
+        registry: String,
+        /// Output path for the `.db`. Defaults to the packages directory.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Human-readable description.
+        #[arg(long)]
+        description: Option<String>,
+        /// Upstream source URL to persist (defaults to `url`).
+        #[arg(long)]
+        source_url: Option<String>,
+        /// Force an HTML crawl instead of trying `llms.txt` first.
+        #[arg(long)]
+        crawl: bool,
+    },
+    /// Build a package from a Rust crate's `rustdoc --output-format json`.
+    ///
+    /// Either point `--json` at an existing rustdoc JSON file, or pass `--crate`
+    /// (and optionally `--manifest-dir`) to run `cargo +nightly rustdoc` for a
+    /// dependency and index the exact locked version's API.
+    BuildRustdoc {
+        /// Path to an existing rustdoc JSON file.
+        #[arg(long, conflicts_with = "crate_name")]
+        json: Option<PathBuf>,
+        /// Crate to document via `cargo +nightly rustdoc` (requires nightly).
+        #[arg(long = "crate")]
+        crate_name: Option<String>,
+        /// Directory containing the Cargo.toml (defaults to current directory).
+        #[arg(long)]
+        manifest_dir: Option<PathBuf>,
+        /// Package name to store as. Defaults to the crate name.
+        #[arg(long)]
+        name: Option<String>,
+        /// Package version.
+        #[arg(long)]
+        version: String,
+        /// Registry identifier. Defaults to `cargo`.
+        #[arg(long, default_value = "cargo")]
+        registry: String,
+        /// Output path for the `.db`. Defaults to the packages directory.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Diff the API surface of two installed package versions.
+    ///
+    /// Reports items added, removed, and changed between two `.db` packages —
+    /// most precise on `build-rustdoc` packages, where headings are item paths.
+    Diff {
+        /// The older package key (e.g. `cargo-axum@0.7.9`).
+        old: String,
+        /// The newer package key (e.g. `cargo-axum@0.8.9`).
+        new: String,
     },
     /// Rebuild installed packages from their upstream sources.
     ///
@@ -123,10 +196,19 @@ enum Command {
     },
     /// Check installed packages against their upstream registries for newer versions.
     ///
-    /// Queries crates.io, npm, and PyPI for the latest stable version of each
+    /// Queries crates.io, npm, and `PyPI` for the latest stable version of each
     /// installed package and prints a table of any drift.  Exit code 1 if any
     /// package is out of date.
     CheckUpdates,
+    /// Report indexing + retrieval-quality health for an installed package.
+    ///
+    /// Prints structural stats and an unsupervised self-retrieval score: for a
+    /// sample of sections it queries by heading title and checks whether the
+    /// section's own chunk is retrieved, giving a label-free quality signal.
+    Doctor {
+        /// Package key (e.g. `npm-next@15.0.0`).
+        package: String,
+    },
     /// Start the MCP server on stdin/stdout (for use by AI coding assistants).
     Mcp,
 }
@@ -148,10 +230,10 @@ async fn main() {
 
     let result = match cli.command {
         Command::Add { package, version } => cmd_add(package, version, &packages_dir).await,
-        Command::Remove { package } => cmd_remove(package, &packages_dir),
+        Command::Remove { package } => cmd_remove(&package, &packages_dir),
         Command::List => cmd_list(&packages_dir).await,
-        Command::Search { package, query, budget } => {
-            cmd_search(package, query, budget, &packages_dir).await
+        Command::Search { package, query, budget, fast } => {
+            cmd_search(package, query, budget, fast, &packages_dir).await
         }
         Command::Build {
             source_dir,
@@ -166,10 +248,45 @@ async fn main() {
             let meta = Package { name, version, registry, description, source_url, git_sha: None };
             cmd_build(source_dir, meta, output, exclude_examples, &packages_dir).await
         }
+        Command::BuildWebsite {
+            url,
+            name,
+            version,
+            registry,
+            output,
+            description,
+            source_url,
+            crawl,
+        } => {
+            let meta = Package {
+                name,
+                version,
+                registry,
+                description,
+                source_url: Some(source_url.unwrap_or_else(|| url.clone())),
+                git_sha: None,
+            };
+            cmd_build_website(url, meta, output, crawl, &packages_dir).await
+        }
+        Command::BuildRustdoc { json, crate_name, manifest_dir, name, version, registry, output } => {
+            cmd_build_rustdoc(
+                json,
+                crate_name,
+                manifest_dir,
+                name,
+                version,
+                registry,
+                output,
+                &packages_dir,
+            )
+            .await
+        }
+        Command::Diff { old, new } => cmd_diff(old, new, &packages_dir).await,
         Command::Update { packages, check } => cmd_update(packages, check, &packages_dir).await,
         Command::Manifest { package, copy } => cmd_manifest(package, copy, &packages_dir).await,
         Command::Info { package } => cmd_info(package, &packages_dir).await,
         Command::CheckUpdates => cmd_check_updates(&packages_dir).await,
+        Command::Doctor { package } => cmd_doctor(package, &packages_dir).await,
         Command::Mcp => cmd_mcp(packages_dir).await,
     };
 
@@ -230,6 +347,9 @@ async fn cmd_add(
         matches.remove(idx)
     };
 
+    // The entry comes from the registry index — an untrusted source. Validate
+    // every identity component before turning it into a filesystem path.
+    entry.metadata.package.validate()?;
     let key = entry.metadata.package.display_key();
     std::fs::create_dir_all(packages_dir).map_err(LoreError::Io)?;
     let target = packages_dir.join(format!("{key}.db"));
@@ -243,8 +363,8 @@ async fn cmd_add(
 }
 
 /// `lore remove <package>` — deletes the package `.db` file.
-fn cmd_remove(package: String, packages_dir: &std::path::Path) -> Result<(), LoreError> {
-    let path = packages_dir.join(format!("{package}.db"));
+fn cmd_remove(package: &str, packages_dir: &std::path::Path) -> Result<(), LoreError> {
+    let path = package_db_path(packages_dir, package)?;
     match std::fs::remove_file(&path) {
         Ok(()) => println!("Removed {package}."),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -282,24 +402,23 @@ async fn cmd_search(
     package: String,
     query: String,
     budget: u32,
+    fast: bool,
     packages_dir: &std::path::Path,
 ) -> Result<(), LoreError> {
-    let path = packages_dir.join(format!("{package}.db"));
-    let db = lore_core::Db::open(&path).await.map_err(|_| {
-        LoreError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("package '{package}' is not installed"),
-        ))
-    })?;
-
-    let cache = lore_mcp::model_cache_dir();
-    let embedder = tokio::task::spawn_blocking(move || lore_build::Embedder::new(&cache))
-        .await
-        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
-
-    let embedding = embedder.embed(&query)?;
+    let db = open_installed(packages_dir, &package).await?;
     let config = lore_core::SearchConfig { token_budget: budget, ..Default::default() };
-    let results = lore_search::search(&db, &query, &embedding, &config).await?;
+
+    let results = if fast {
+        // Keyword-only: no embedding model load (~300 ms saved per invocation).
+        lore_search::search_keyword(&db, &query, &config).await?
+    } else {
+        let cache = lore_mcp::model_cache_dir();
+        let embedder = tokio::task::spawn_blocking(move || lore_build::Embedder::new(&cache))
+            .await
+            .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
+        let embedding = embedder.embed(&query)?;
+        lore_search::search(&db, &query, &embedding, &config).await?
+    };
 
     if results.is_empty() {
         println!("No results found.");
@@ -323,10 +442,8 @@ async fn cmd_search(
             let preview = if preview.len() > PREVIEW_LEN {
                 // Find the last valid UTF-8 char boundary at or before PREVIEW_LEN
                 // to avoid panicking on multibyte chars (CJK, emoji, etc.)
-                let boundary = (0..=PREVIEW_LEN)
-                    .rev()
-                    .find(|&i| preview.is_char_boundary(i))
-                    .unwrap_or(0);
+                let boundary =
+                    (0..=PREVIEW_LEN).rev().find(|&i| preview.is_char_boundary(i)).unwrap_or(0);
                 format!("{}…", &preview[..boundary])
             } else {
                 preview.to_owned()
@@ -346,6 +463,7 @@ async fn cmd_build(
     exclude_examples: bool,
     packages_dir: &std::path::Path,
 ) -> Result<(), LoreError> {
+    meta.validate()?;
     let display_key = meta.display_key();
     let output_path = output.unwrap_or_else(|| packages_dir.join(format!("{display_key}.db")));
 
@@ -358,8 +476,21 @@ async fn cmd_build(
         .await
         .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
 
+    // Build into a temp file and atomically rename on success, so a failed or
+    // interrupted build never leaves a half-written package at `output_path`
+    // (mirrors `lore update`'s rebuild path).
+    let tmp_path = output_path.with_extension("db.building");
+    let _ = std::fs::remove_file(&tmp_path);
+
     let meta_ref = meta.clone();
-    let stats = builder.build(&source_dir, meta, &output_path, exclude_examples).await?;
+    let stats = match builder.build(&source_dir, meta, &tmp_path, exclude_examples).await {
+        Ok(stats) => stats,
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            return Err(e);
+        }
+    };
+    std::fs::rename(&tmp_path, &output_path).map_err(LoreError::Io)?;
 
     spinner.finish_and_clear();
 
@@ -384,19 +515,198 @@ async fn cmd_build(
     Ok(())
 }
 
+/// `lore build-website <url>` — build a package from a live website.
+///
+/// Prefers the site's `llms.txt` / `llms-full.txt` digest; falls back to an
+/// HTML crawl (or goes straight to crawl with `--crawl`). Writes atomically.
+async fn cmd_build_website(
+    url: String,
+    meta: Package,
+    output: Option<PathBuf>,
+    crawl: bool,
+    packages_dir: &std::path::Path,
+) -> Result<(), LoreError> {
+    use lore_build::Source as _;
+
+    meta.validate()?;
+    let display_key = meta.display_key();
+    let output_path = output.unwrap_or_else(|| packages_dir.join(format!("{display_key}.db")));
+    std::fs::create_dir_all(packages_dir).map_err(LoreError::Io)?;
+
+    let spinner = make_spinner(format!("Fetching {url}…"));
+    let prepared = if crawl {
+        lore_build::WebsiteSource::new(&url).prepare().await?
+    } else {
+        // Try the llms.txt digest first; fall back to a crawl.
+        match lore_build::LlmsTxtSource::new(&url).prepare().await {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::info!(error = %e, "no llms.txt; falling back to crawl");
+                lore_build::WebsiteSource::new(&url).prepare().await?
+            }
+        }
+    };
+    spinner.set_message(format!("Building {display_key}…"));
+
+    let cache = lore_mcp::model_cache_dir();
+    let builder = tokio::task::spawn_blocking(move || lore_build::PackageBuilder::new(&cache))
+        .await
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
+
+    let tmp_path = output_path.with_extension("db.building");
+    let _ = std::fs::remove_file(&tmp_path);
+    let meta_ref = meta.clone();
+    let stats = match builder.build(&prepared.dir, meta, &tmp_path, false).await {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            return Err(e);
+        }
+    };
+    std::fs::rename(&tmp_path, &output_path).map_err(LoreError::Io)?;
+    spinner.finish_and_clear();
+
+    let _ = lore_build::write_manifest(&output_path, &meta_ref, &stats);
+    println!(
+        "{} Built {} → {}",
+        style("✓").green().bold(),
+        style(&display_key).bold(),
+        output_path.display()
+    );
+    println!("{}", stats.summary());
+    Ok(())
+}
+
+/// `lore build-rustdoc` — build a package from rustdoc JSON.
+#[allow(clippy::too_many_arguments)] // each flag is a distinct, independent input
+async fn cmd_build_rustdoc(
+    json: Option<PathBuf>,
+    crate_name: Option<String>,
+    manifest_dir: Option<PathBuf>,
+    name: Option<String>,
+    version: String,
+    registry: String,
+    output: Option<PathBuf>,
+    packages_dir: &std::path::Path,
+) -> Result<(), LoreError> {
+    use lore_build::Source as _;
+
+    let pkg_name = name
+        .or_else(|| crate_name.clone())
+        .or_else(|| {
+            json.as_ref().and_then(|p| p.file_stem()).and_then(|s| s.to_str()).map(str::to_owned)
+        })
+        .ok_or_else(|| LoreError::InvalidConfig("provide --name, --crate, or --json".into()))?;
+
+    let meta = Package {
+        name: pkg_name,
+        version,
+        registry,
+        description: None,
+        source_url: None,
+        git_sha: None,
+    };
+    meta.validate()?;
+    let display_key = meta.display_key();
+    let output_path = output.unwrap_or_else(|| packages_dir.join(format!("{display_key}.db")));
+    std::fs::create_dir_all(packages_dir).map_err(LoreError::Io)?;
+
+    let source = match (json, crate_name) {
+        (Some(path), _) => lore_build::RustdocSource::from_json(path),
+        (None, Some(c)) => lore_build::RustdocSource::from_crate(c, manifest_dir.unwrap_or_default()),
+        (None, None) => {
+            return Err(LoreError::InvalidConfig("provide either --json or --crate".into()));
+        }
+    };
+
+    let spinner = make_spinner(format!("Generating rustdoc for {display_key}…"));
+    let prepared = source.prepare().await?;
+    spinner.set_message(format!("Building {display_key}…"));
+
+    let cache = lore_mcp::model_cache_dir();
+    let builder = tokio::task::spawn_blocking(move || lore_build::PackageBuilder::new(&cache))
+        .await
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
+
+    let tmp_path = output_path.with_extension("db.building");
+    let _ = std::fs::remove_file(&tmp_path);
+    let meta_ref = meta.clone();
+    let stats = match builder.build(&prepared.dir, meta, &tmp_path, false).await {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            return Err(e);
+        }
+    };
+    std::fs::rename(&tmp_path, &output_path).map_err(LoreError::Io)?;
+    spinner.finish_and_clear();
+
+    let _ = lore_build::write_manifest(&output_path, &meta_ref, &stats);
+    println!(
+        "{} Built {} → {}",
+        style("✓").green().bold(),
+        style(&display_key).bold(),
+        output_path.display()
+    );
+    println!("{}", stats.summary());
+    Ok(())
+}
+
+/// `lore diff <old> <new>` — report API changes between two package versions.
+async fn cmd_diff(
+    old: String,
+    new: String,
+    packages_dir: &std::path::Path,
+) -> Result<(), LoreError> {
+    let old_db = open_installed(packages_dir, &old).await?;
+    let new_db = open_installed(packages_dir, &new).await?;
+
+    let old_api = lore_build::api_surface(&old_db).await?;
+    let new_api = lore_build::api_surface(&new_db).await?;
+
+    let diff = lore_build::diff_api(&old_api, &new_api);
+    if diff.added.is_empty() && diff.removed.is_empty() && diff.changed.is_empty() {
+        println!("No API differences detected between {old} and {new}.");
+        return Ok(());
+    }
+
+    println!("{}", style(format!("API diff: {old} → {new}")).bold());
+    if !diff.removed.is_empty() {
+        println!("\n{} Removed ({})", style("−").red().bold(), diff.removed.len());
+        for item in &diff.removed {
+            println!("  {} {item}", style("−").red());
+        }
+    }
+    if !diff.added.is_empty() {
+        println!("\n{} Added ({})", style("+").green().bold(), diff.added.len());
+        for item in &diff.added {
+            println!("  {} {item}", style("+").green());
+        }
+    }
+    if !diff.changed.is_empty() {
+        println!("\n{} Changed ({})", style("~").yellow().bold(), diff.changed.len());
+        for (item, from, to) in &diff.changed {
+            println!("  {} {item}", style("~").yellow());
+            println!("      {} {from}", style("was:").dim());
+            println!("      {} {to}", style("now:").dim());
+        }
+    }
+    if !diff.removed.is_empty() || !diff.changed.is_empty() {
+        println!(
+            "\n{} removals and signature changes are potential breaking changes.",
+            style("⚠").yellow().bold()
+        );
+    }
+    Ok(())
+}
+
 /// `lore manifest <package>` — prints the compressed API surface manifest.
 async fn cmd_manifest(
     package: String,
     copy: bool,
     packages_dir: &std::path::Path,
 ) -> Result<(), LoreError> {
-    let path = packages_dir.join(format!("{package}.db"));
-    let db = lore_core::Db::open(&path).await.map_err(|_| {
-        LoreError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("package '{package}' is not installed"),
-        ))
-    })?;
+    let db = open_installed(packages_dir, &package).await?;
 
     let manifest =
         db.get_meta("manifest".to_owned()).await?.filter(|m| !m.is_empty()).ok_or_else(|| {
@@ -409,7 +719,7 @@ async fn cmd_manifest(
         // Try pbcopy (macOS), then xclip, then xsel.
         let copied = try_copy_to_clipboard(&manifest);
         if copied {
-            println!("{}", manifest);
+            println!("{manifest}");
             println!("{} Copied to clipboard", style("✓").green().bold());
         } else {
             eprintln!(
@@ -427,18 +737,13 @@ async fn cmd_manifest(
 
 /// `lore info <package>` — shows detailed package metadata and statistics.
 async fn cmd_info(package: String, packages_dir: &std::path::Path) -> Result<(), LoreError> {
-    let path = packages_dir.join(format!("{package}.db"));
-    let db = lore_core::Db::open(&path).await.map_err(|_| {
-        LoreError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("package '{package}' is not installed"),
-        ))
-    })?;
+    let path = package_db_path(packages_dir, &package)?;
+    let db = open_installed(packages_dir, &package).await?;
 
     let meta = db.get_package_meta().await?;
 
     // File size.
-    let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let size_bytes = std::fs::metadata(&path).map_or(0, |m| m.len());
     let size_display = format_bytes(size_bytes);
 
     // Node counts by kind.
@@ -545,6 +850,86 @@ async fn cmd_mcp(packages_dir: PathBuf) -> Result<(), LoreError> {
     lore_mcp::serve_stdio(packages_dir).await
 }
 
+/// Maximum number of sections sampled for the self-retrieval quality score.
+const DOCTOR_SAMPLE: usize = 40;
+
+/// `lore doctor <package>` — structural stats + unsupervised retrieval quality.
+#[allow(clippy::cast_precision_loss)] // percentages/MRR are cosmetic display math
+async fn cmd_doctor(package: String, packages_dir: &std::path::Path) -> Result<(), LoreError> {
+    let db = open_installed(packages_dir, &package).await?;
+
+    let chunks = db.get_nodes_by_kind(lore_core::NodeKind::Chunk).await?;
+    let code_blocks = db.get_nodes_by_kind(lore_core::NodeKind::CodeBlock).await?;
+    let headings = db.get_nodes_by_kind(lore_core::NodeKind::Heading).await?;
+
+    // Structural health: how many chunks exceed the embedding model's ~512-token
+    // input window and are therefore truncated at embed time.
+    let oversized = chunks.iter().filter(|n| n.token_count > 512).count();
+    let total_content = chunks.len() + code_blocks.len();
+
+    println!("{}", style(format!("Doctor report: {package}")).bold());
+    println!("  Chunks:       {}", chunks.len());
+    println!("  Code blocks:  {}", code_blocks.len());
+    println!("  Headings:     {}", headings.len());
+    if total_content > 0 {
+        let pct = (oversized as f64 / total_content as f64) * 100.0;
+        println!("  Oversized:    {oversized} chunks > 512 tokens ({pct:.1}% — truncated at embed)");
+    }
+
+    // Self-retrieval: query each sampled chunk by a short prefix of its own
+    // content and check whether that chunk comes back near the top. A low score
+    // means the index is over-chunked, noisy, or the relevance filter is
+    // dropping legitimate matches — all things that hurt real queries too.
+    let sample: Vec<_> = chunks
+        .iter()
+        .filter(|n| n.content.as_deref().is_some_and(|c| c.split_whitespace().count() >= 4))
+        .step_by(1.max(chunks.len() / DOCTOR_SAMPLE))
+        .take(DOCTOR_SAMPLE)
+        .collect();
+
+    if sample.is_empty() {
+        println!("\n  Not enough content to compute a retrieval score.");
+        return Ok(());
+    }
+
+    let cache = lore_mcp::model_cache_dir();
+    let embedder = tokio::task::spawn_blocking(move || lore_build::Embedder::new(&cache))
+        .await
+        .map_err(|e| LoreError::Io(std::io::Error::other(e.to_string())))??;
+    let config = lore_core::SearchConfig::default();
+
+    let (mut rr_sum, mut hit1, mut hit3) = (0.0_f64, 0u32, 0u32);
+    for node in &sample {
+        let Some(content) = node.content.as_deref() else { continue };
+        // Query with the first ~10 words — enough to be specific without being
+        // the whole chunk verbatim.
+        let query: String = content.split_whitespace().take(10).collect::<Vec<_>>().join(" ");
+        let embedding = embedder.embed(&query)?;
+        let results = lore_search::search(&db, &query, &embedding, &config).await?;
+        if let Some(rank) = results.iter().position(|r| r.node.id == node.id) {
+            rr_sum += 1.0 / (rank as f64 + 1.0);
+            if rank == 0 {
+                hit1 += 1;
+            }
+            if rank < 3 {
+                hit3 += 1;
+            }
+        }
+    }
+    let n = sample.len() as f64;
+    println!("\n  {} ({} sampled sections)", style("Self-retrieval quality").bold(), sample.len());
+    println!("    MRR:    {:.3}", rr_sum / n);
+    println!("    Hit@1:  {hit1}/{} ({:.0}%)", sample.len(), f64::from(hit1) / n * 100.0);
+    println!("    Hit@3:  {hit3}/{} ({:.0}%)", sample.len(), f64::from(hit3) / n * 100.0);
+    if rr_sum / n < 0.5 {
+        println!(
+            "  {} low self-retrieval — the index may be over-chunked or noisy.",
+            style("⚠").yellow().bold()
+        );
+    }
+    Ok(())
+}
+
 /// `lore update [packages] [--check]` — rebuild installed packages from their upstream sources.
 ///
 /// For each package the update pipeline is:
@@ -608,17 +993,14 @@ async fn cmd_update(
     let mut n_failed: u32 = 0;
 
     for (key, meta) in &to_update {
-        let source_url = match &meta.source_url {
-            Some(u) => u.clone(),
-            None => {
-                println!(
-                    "  {} {} — skipped (no remote source; use `lore build <dir>` to rebuild)",
-                    style("⟳").yellow().bold(),
-                    style(key).bold()
-                );
-                n_skipped += 1;
-                continue;
-            }
+        let Some(source_url) = meta.source_url.clone() else {
+            println!(
+                "  {} {} — skipped (no remote source; use `lore build <dir>` to rebuild)",
+                style("⟳").yellow().bold(),
+                style(key).bold()
+            );
+            n_skipped += 1;
+            continue;
         };
 
         let spinner = make_spinner(format!("Updating {key}…"));
@@ -666,6 +1048,7 @@ fn update_source_description(meta: &lore_core::Package) -> String {
 ///
 /// Matches `https://{github,gitlab,bitbucket}.*`, URLs ending with `.git`,
 /// and `git://` / `git@` schemes.
+#[allow(clippy::case_sensitive_file_extension_comparisons)] // git URLs use lowercase `.git`
 fn looks_like_git_url(url: &str) -> bool {
     url.ends_with(".git")
         || url.starts_with("git://")
@@ -752,7 +1135,7 @@ fn try_copy_to_clipboard(text: &str) -> bool {
                 let mut stdin = stdin;
                 if stdin.write_all(text.as_bytes()).is_ok() {
                     drop(stdin);
-                    if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    if child.wait().is_ok_and(|s| s.success()) {
                         return true;
                     }
                 }
@@ -763,6 +1146,7 @@ fn try_copy_to_clipboard(text: &str) -> bool {
 }
 
 /// Formats a byte count as a human-readable string (e.g. `"12.3 MB"`).
+#[allow(clippy::cast_precision_loss)] // display rounding; exact bytes not needed
 fn format_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
@@ -780,14 +1164,54 @@ fn format_bytes(bytes: u64) -> String {
 }
 
 /// Creates a cyan spinner with `msg` already ticking.
+#[allow(clippy::literal_string_with_formatting_args)] // indicatif template, not a format! arg
 fn make_spinner(msg: impl Into<std::borrow::Cow<'static, str>>) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}").expect("valid template"),
-    );
+    // Cosmetic: fall back to the default spinner if the template ever fails.
+    if let Ok(style) = ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}") {
+        pb.set_style(style);
+    }
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
     pb.set_message(msg);
     pb
+}
+
+/// Resolves the on-disk `.db` path for `package_key`, rejecting any key that
+/// could escape `packages_dir`.
+///
+/// This is the CLI's single guard for the path-traversal invariant defined by
+/// [`validate_package_key`]; every subcommand that opens or removes a package
+/// database routes through it.
+fn package_db_path(
+    packages_dir: &std::path::Path,
+    package_key: &str,
+) -> Result<PathBuf, LoreError> {
+    validate_package_key(package_key)?;
+    Ok(packages_dir.join(format!("{package_key}.db")))
+}
+
+/// Opens an already-installed package database for reading.
+///
+/// Validates the key, verifies the file exists (so a typo'd name reports
+/// "not installed" instead of silently creating an empty database — `SQLite`
+/// opens with `CREATE` by default), then opens it.
+async fn open_installed(
+    packages_dir: &std::path::Path,
+    package: &str,
+) -> Result<lore_core::Db, LoreError> {
+    let path = package_db_path(packages_dir, package)?;
+    if !path.is_file() {
+        return Err(LoreError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("package '{package}' is not installed"),
+        )));
+    }
+    lore_core::Db::open(&path).await.map_err(|_| {
+        LoreError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("package '{package}' is not installed"),
+        ))
+    })
 }
 
 /// Returns the default packages directory: `~/.local/share/lore/packages`.

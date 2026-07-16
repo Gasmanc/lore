@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 //! # lore-build
 //!
 //! Document parsing, chunking, embedding, and indexing pipeline for Lore.
@@ -13,13 +14,12 @@
 //! 4. **Indexing** — (Phase 5) writes nodes, FTS5 entries, and vector
 //!    embeddings into a [`lore_core::Db`].
 
-#![deny(clippy::all, clippy::pedantic, clippy::nursery, missing_docs, rust_2018_idioms)]
-#![allow(clippy::module_name_repetitions, clippy::missing_errors_doc, clippy::must_use_candidate)]
-
 /// Package build orchestrator — coordinates the full pipeline.
 pub mod builder;
 /// Chunking pipeline: structural splitting and semantic refinement.
 pub mod chunker;
+/// API-surface extraction and version diffing.
+pub mod diff;
 /// File discovery — finds documentation files in a directory tree.
 pub mod discovery;
 /// Embedding pipeline using `fastembed` with `bge-small-en-v1.5`.
@@ -37,6 +37,7 @@ pub mod tokens;
 
 pub use builder::{BuildStats, PackageBuilder};
 pub use chunker::{ChunkConfig, ChunkTree, RawChunk, SemanticRefiner, StructuralChunker};
+pub use diff::{ApiDiff, ApiSurface, api_surface, diff_api};
 pub use discovery::discover_files;
 pub use embedder::{EMBEDDING_DIMS, Embedder, build_contextual_text};
 pub use indexer::{FileStats, Indexer};
@@ -45,5 +46,8 @@ pub use parser::{
     AsciidocParser, ContentBlock, HeadingNode, HtmlParser, MarkdownParser, ParsedDoc,
     ParserRegistry, RstParser, detect_primary_heading_level,
 };
-pub use source::{GitSource, LocalSource, PreparedSource, Source, WebsiteSource};
+pub use source::{
+    GitSource, LlmsTxtSource, LocalSource, PreparedSource, RustdocInput, RustdocSource, Source,
+    WebsiteSource, rustdoc_json_to_markdown,
+};
 pub use tokens::TokenCounter;

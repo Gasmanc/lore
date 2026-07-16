@@ -11,3 +11,6 @@ repository.workspace = true
 lore-core = { path = "../lore-core" }
 tokio     = { workspace = true }
 tracing   = { workspace = true }
+
+[lints]
+workspace = true

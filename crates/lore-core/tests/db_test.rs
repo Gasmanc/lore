@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::pedantic, clippy::nursery)]
 //! Integration tests for [`lore_core::Db`].
 //!
 //! Each test opens a fresh in-memory database so they are fully isolated and
@@ -635,7 +636,7 @@ async fn test_insert_and_retrieve_embedding_roundtrip() {
         .await
         .expect("insert_node failed");
 
-    let original: Vec<f32> = (0..384).map(|i| i as f32 * 0.001_f32).collect();
+    let original: Vec<f32> = (0..384_i16).map(|i| f32::from(i) * 0.001_f32).collect();
     db.insert_embedding(node_id, original.clone()).await.expect("insert_embedding failed");
 
     let retrieved = db

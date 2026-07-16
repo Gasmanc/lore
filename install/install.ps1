@@ -42,7 +42,12 @@ try {
 
     $Expected = (Get-Content (Join-Path $Tmp "SHA256SUMS") | Where-Object { $_ -match [regex]::Escape($Archive) }) -split '\s+' | Select-Object -First 1
     $Actual   = (Get-FileHash (Join-Path $Tmp $Archive) -Algorithm SHA256).Hash.ToLower()
-    if ($Expected -and $Actual -ne $Expected) {
+    # Fail closed: a missing checksum line must abort, never install unverified.
+    if (-not $Expected) {
+        Write-Error "No checksum found for $Archive in SHA256SUMS — refusing to install"
+        exit 1
+    }
+    if ($Actual -ne $Expected.ToLower()) {
         Write-Error "Checksum mismatch for $Archive"
         exit 1
     }

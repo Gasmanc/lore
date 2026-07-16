@@ -16,17 +16,20 @@ const K: f64 = 60.0;
 /// Empty input lists are ignored.  If the same node appears in multiple lists
 /// its RRF score is the sum of per-list contributions.  The output is sorted
 /// by descending RRF score.
+///
+/// Takes the lists by value and moves each node out of them, so no [`Node`]
+/// (which may carry a multi-kilobyte content string) is ever cloned.
 #[must_use]
-pub fn merge(lists: &[Vec<ScoredNode>]) -> Vec<ScoredNode> {
+pub fn merge(lists: Vec<Vec<ScoredNode>>) -> Vec<ScoredNode> {
     let mut scores: HashMap<i64, f64> = HashMap::new();
     let mut nodes: HashMap<i64, Node> = HashMap::new();
 
     for list in lists {
-        for (rank, scored) in list.iter().enumerate() {
+        for (rank, scored) in list.into_iter().enumerate() {
             #[allow(clippy::cast_precision_loss)]
             let rrf = 1.0 / (K + (rank + 1) as f64);
             *scores.entry(scored.node.id).or_insert(0.0) += rrf;
-            nodes.entry(scored.node.id).or_insert_with(|| scored.node.clone());
+            nodes.entry(scored.node.id).or_insert(scored.node);
         }
     }
 
@@ -70,7 +73,7 @@ mod tests {
     #[test]
     fn merge_single_list_preserves_order() {
         let list = vec![scored(1, 3.0), scored(2, 2.0), scored(3, 1.0)];
-        let result = merge(&[list]);
+        let result = merge(vec![list]);
         let ids: Vec<i64> = result.iter().map(|n| n.node.id).collect();
         assert_eq!(ids, vec![1, 2, 3]);
     }
@@ -81,7 +84,7 @@ mod tests {
         // node 2 which appears at rank 1 in list A and not in list B.
         let list_a = vec![scored(1, 1.0), scored(2, 0.5)];
         let list_b = vec![scored(3, 1.0), scored(1, 0.8)];
-        let result = merge(&[list_a, list_b]);
+        let result = merge(vec![list_a, list_b]);
         // Node 1 appears twice; it should beat node 3 which appears once at rank 0.
         let top = result[0].node.id;
         assert_eq!(top, 1, "node present in both lists should rank highest");
@@ -89,13 +92,13 @@ mod tests {
 
     #[test]
     fn merge_empty_lists_returns_empty() {
-        let result = merge(&[vec![], vec![]]);
+        let result = merge(vec![vec![], vec![]]);
         assert!(result.is_empty());
     }
 
     #[test]
     fn merge_no_lists_returns_empty() {
-        let result = merge(&[]);
+        let result = merge(vec![]);
         assert!(result.is_empty());
     }
 }

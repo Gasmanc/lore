@@ -50,6 +50,7 @@ static VEC_EXTENSION_INIT: OnceLock<()> = OnceLock::new();
 /// function pointer transmutation is the documented pattern for registering
 /// `SQLite` extensions from Rust (mirrors the approach used in the `sqlite-vec`
 /// crate's own test suite).
+#[allow(unsafe_code)] // The one FFI registration point; soundness argued below.
 fn ensure_vec_extension_registered() {
     VEC_EXTENSION_INIT.get_or_init(|| {
         // SAFETY: `sqlite3_auto_extension` expects a pointer to a function
@@ -219,16 +220,18 @@ impl Db {
                     );",
                 )?;
 
-                let version: u32 = db
-                    .query_row(
-                        "SELECT COALESCE(
+                // The COALESCE already yields 0 for a missing key, so any error
+                // here is a real failure (I/O, corruption) and must propagate —
+                // swallowing it would silently reset version tracking and re-run
+                // every migration.
+                let version: u32 = db.query_row(
+                    "SELECT COALESCE(
                             (SELECT CAST(value AS INTEGER) FROM meta WHERE key = 'schema_version'),
                             0
                         )",
-                        [],
-                        |row| row.get(0),
-                    )
-                    .unwrap_or(0);
+                    [],
+                    |row| row.get(0),
+                )?;
 
                 for (idx, migration_sql) in MIGRATIONS.iter().enumerate() {
                     // `MIGRATIONS` will never have 2^32 entries; the cast is safe.

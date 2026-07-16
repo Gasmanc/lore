@@ -93,6 +93,10 @@ enum Context {
     Code,
     /// Inside a table.
     Table,
+    /// Inside a list (bullet or ordered). Tight lists emit `Text` events with
+    /// no enclosing `Paragraph`, so list text needs its own capture context or
+    /// every bullet is silently dropped.
+    List,
 }
 
 struct ParseState {
@@ -103,6 +107,10 @@ struct ParseState {
     code_lang: Option<String>,
     code_text: String,
     table_text: String,
+    /// Accumulated text for the list currently being parsed.
+    list_text: String,
+    /// Nesting depth of the current list; the buffer is flushed when it hits 0.
+    list_depth: u32,
 }
 
 impl ParseState {
@@ -115,6 +123,8 @@ impl ParseState {
             code_lang: None,
             code_text: String::new(),
             table_text: String::new(),
+            list_text: String::new(),
+            list_depth: 0,
         }
     }
 
@@ -125,6 +135,25 @@ impl ParseState {
         let text = strip_jsx(text.trim());
         if !text.is_empty() {
             node.blocks.push(ContentBlock::Paragraph(text));
+        }
+    }
+
+    /// Flush accumulated list text to `node` as a [`ContentBlock::Paragraph`].
+    fn flush_list(&mut self, node: &mut HeadingNode) {
+        self.ctx = Context::None;
+        let text = std::mem::take(&mut self.list_text);
+        let text = strip_jsx(text.trim());
+        if !text.is_empty() {
+            node.blocks.push(ContentBlock::Paragraph(text));
+        }
+    }
+
+    /// Flush whichever text buffer (paragraph or list) is currently active.
+    fn flush_text(&mut self, node: &mut HeadingNode) {
+        match self.ctx {
+            Context::Paragraph => self.flush_paragraph(node),
+            Context::List => self.flush_list(node),
+            _ => self.ctx = Context::None,
         }
     }
 }
@@ -140,14 +169,18 @@ fn build_tree(content: &str) -> HeadingNode {
     opts.insert(Options::ENABLE_TASKLISTS);
 
     let parser = CmarkParser::new_ext(content, opts);
-    let mut stack: Vec<HeadingNode> = vec![HeadingNode::root()];
+    // The root is held separately and never pushed onto `stack`, so the
+    // "current node" is always `stack.last_mut().unwrap_or(&mut root)` — no
+    // `unwrap()` can ever fail, satisfying the no-unwrap policy.
+    let mut root = HeadingNode::root();
+    let mut stack: Vec<HeadingNode> = Vec::new();
     let mut s = ParseState::new();
 
     for event in parser {
         match event {
             // ── Headings ───────────────────────────────────────────────────
             Event::Start(Tag::Heading { level, .. }) => {
-                s.flush_paragraph(stack.last_mut().unwrap());
+                s.flush_text(current(&mut stack, &mut root));
                 s.ctx = Context::Heading;
                 s.heading_level = heading_level_to_u8(level);
                 s.heading_text.clear();
@@ -156,10 +189,10 @@ fn build_tree(content: &str) -> HeadingNode {
                 let title = strip_jsx(s.heading_text.trim());
                 let new_node =
                     HeadingNode { level: s.heading_level, title, ..HeadingNode::default() };
-                // Pop stack until we find a proper parent (lower level).
-                while stack.len() > 1 && stack.last().is_some_and(|n| n.level >= s.heading_level) {
-                    let completed = stack.pop().unwrap();
-                    stack.last_mut().unwrap().children.push(completed);
+                // Pop completed siblings/ancestors until we find a proper parent.
+                while stack.last().is_some_and(|n| n.level >= s.heading_level) {
+                    let Some(completed) = stack.pop() else { break };
+                    current(&mut stack, &mut root).children.push(completed);
                 }
                 stack.push(new_node);
                 s.ctx = Context::None;
@@ -172,12 +205,33 @@ fn build_tree(content: &str) -> HeadingNode {
                 s.paragraph_text.clear();
             }
             Event::End(TagEnd::Paragraph) if s.ctx == Context::Paragraph => {
-                s.flush_paragraph(stack.last_mut().unwrap());
+                s.flush_paragraph(current(&mut stack, &mut root));
+            }
+
+            // ── Lists (tight or loose) ─────────────────────────────────────
+            Event::Start(Tag::List(_)) => {
+                if s.list_depth == 0 {
+                    s.flush_text(current(&mut stack, &mut root));
+                    s.ctx = Context::List;
+                    s.list_text.clear();
+                }
+                s.list_depth = s.list_depth.saturating_add(1);
+            }
+            Event::Start(Tag::Item) if s.ctx == Context::List => {
+                if !s.list_text.is_empty() {
+                    s.list_text.push('\n');
+                }
+            }
+            Event::End(TagEnd::List(_)) => {
+                s.list_depth = s.list_depth.saturating_sub(1);
+                if s.list_depth == 0 {
+                    s.flush_list(current(&mut stack, &mut root));
+                }
             }
 
             // ── Code blocks ────────────────────────────────────────────────
             Event::Start(Tag::CodeBlock(kind)) => {
-                s.flush_paragraph(stack.last_mut().unwrap());
+                s.flush_text(current(&mut stack, &mut root));
                 s.ctx = Context::Code;
                 s.code_lang = match &kind {
                     CodeBlockKind::Fenced(lang) => {
@@ -189,33 +243,36 @@ fn build_tree(content: &str) -> HeadingNode {
                 s.code_text.clear();
             }
             Event::End(TagEnd::CodeBlock) => {
-                s.ctx = Context::None;
                 let content = std::mem::take(&mut s.code_text);
                 if !content.trim().is_empty() {
-                    stack
-                        .last_mut()
-                        .unwrap()
+                    current(&mut stack, &mut root)
                         .blocks
                         .push(ContentBlock::Code { lang: s.code_lang.take(), content });
                 }
+                // Resume list accumulation if the code block was nested in a list.
+                s.ctx = if s.list_depth > 0 { Context::List } else { Context::None };
             }
 
             // ── Tables ─────────────────────────────────────────────────────
             Event::Start(Tag::Table(_)) => {
-                s.flush_paragraph(stack.last_mut().unwrap());
+                s.flush_text(current(&mut stack, &mut root));
                 s.ctx = Context::Table;
                 s.table_text.clear();
             }
             Event::End(TagEnd::Table) => {
-                s.ctx = Context::None;
                 let content = std::mem::take(&mut s.table_text);
                 if !content.trim().is_empty() {
-                    stack.last_mut().unwrap().blocks.push(ContentBlock::Table(content));
+                    current(&mut stack, &mut root).blocks.push(ContentBlock::Table(content));
                 }
+                s.ctx = if s.list_depth > 0 { Context::List } else { Context::None };
             }
 
             // ── Text ───────────────────────────────────────────────────────
-            Event::Text(text) | Event::Code(text) => {
+            // `InlineHtml`/`Html` are captured too: pulldown-cmark parses `<T>`,
+            // `<String>` (and MDX tags) as HTML events, so dropping them would
+            // corrupt generic-type mentions. `strip_jsx` then removes only
+            // genuine component tags from the assembled text.
+            Event::Text(text) | Event::Code(text) | Event::InlineHtml(text) | Event::Html(text) => {
                 let t = text.as_ref();
                 match s.ctx {
                     Context::Heading => s.heading_text.push_str(t),
@@ -225,23 +282,31 @@ fn build_tree(content: &str) -> HeadingNode {
                         s.table_text.push(' ');
                     }
                     Context::Paragraph => s.paragraph_text.push_str(t),
+                    Context::List => s.list_text.push_str(t),
                     Context::None => {}
                 }
             }
-            Event::SoftBreak | Event::HardBreak if s.ctx == Context::Paragraph => {
-                s.paragraph_text.push('\n');
-            }
+            Event::SoftBreak | Event::HardBreak => match s.ctx {
+                Context::Paragraph => s.paragraph_text.push('\n'),
+                Context::List => s.list_text.push(' '),
+                _ => {}
+            },
 
             _ => {}
         }
     }
 
-    s.flush_paragraph(stack.last_mut().unwrap());
-    while stack.len() > 1 {
-        let completed = stack.pop().unwrap();
-        stack.last_mut().unwrap().children.push(completed);
+    s.flush_text(current(&mut stack, &mut root));
+    while let Some(completed) = stack.pop() {
+        current(&mut stack, &mut root).children.push(completed);
     }
-    stack.pop().unwrap()
+    root
+}
+
+/// The heading node currently being filled: the deepest open heading on
+/// `stack`, or `root` when no heading is open. Never panics.
+fn current<'a>(stack: &'a mut [HeadingNode], root: &'a mut HeadingNode) -> &'a mut HeadingNode {
+    stack.last_mut().unwrap_or(root)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -257,8 +322,21 @@ const fn heading_level_to_u8(level: HeadingLevel) -> u8 {
     }
 }
 
-/// Remove MDX JSX tags like `<AppOnly>`, `</AppOnly>`, `<Callout type="info">`.
-/// Only uppercase-starting tags are stripped (to avoid stripping HTML entities).
+/// Remove MDX JSX component tags like `<AppOnly>`, `</AppOnly>`,
+/// `<Callout type="info">`, while preserving generic-type syntax that merely
+/// *looks* like a tag.
+///
+/// A `<…>` run is only stripped when all of the following hold:
+/// * the `<` is not immediately preceded by an identifier character — so
+///   `Vec<String>`, `Option<T>`, and `HashMap<K, V>` are left intact;
+/// * the tag name (after an optional `/`) starts with an uppercase letter and
+///   is **at least two characters** long — so bare generic parameters like
+///   `<T>`, `<E>`, `<K>` are left intact;
+/// * a closing `>` exists.
+///
+/// MDX component names are `PascalCase` and ≥ 2 characters, so this keeps the
+/// intended behaviour while no longer corrupting Rust/TypeScript generics that
+/// pervade the docs this tool indexes.
 fn strip_jsx(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let bytes = text.as_bytes();
@@ -268,8 +346,20 @@ fn strip_jsx(text: &str) -> String {
     while i < len {
         if bytes[i] == b'<' {
             let start = i + 1;
-            let name_start = if start < len && bytes[start] == b'/' { start + 1 } else { start };
-            if name_start < len && bytes[name_start].is_ascii_uppercase() {
+            let is_closing = start < len && bytes[start] == b'/';
+            let name_start = if is_closing { start + 1 } else { start };
+            // The identifier-guard (skip `Vec<…>` generics) applies only to
+            // opening tags — a closing tag such as `Note</Callout>` legitimately
+            // abuts preceding text and must still be stripped.
+            let generic_open = !is_closing && preceded_by_identifier(bytes, i);
+            // Tag name must start uppercase and be ≥ 2 ASCII-alphanumeric chars.
+            let name_len =
+                bytes[name_start..].iter().take_while(|b| b.is_ascii_alphanumeric()).count();
+            let looks_like_tag = !generic_open
+                && name_start < len
+                && bytes[name_start].is_ascii_uppercase()
+                && name_len >= 2;
+            if looks_like_tag {
                 if let Some(rel) = bytes[i..].iter().position(|&b| b == b'>') {
                     i += rel + 1;
                     continue;
@@ -283,6 +373,13 @@ fn strip_jsx(text: &str) -> String {
     }
 
     out
+}
+
+/// Returns `true` if the byte before position `i` is an identifier character
+/// (ASCII alphanumeric or `_`), i.e. the `<` at `i` is a generic like `Vec<…>`
+/// rather than the start of a tag.
+fn preceded_by_identifier(bytes: &[u8], i: usize) -> bool {
+    i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_')
 }
 
 /// Walk the tree and remove `ToC` heading nodes.
@@ -414,5 +511,40 @@ mod tests {
         let doc = parse(md);
         assert!(doc.root.children.iter().all(|n| n.title != "Table of Contents"));
         assert!(doc.root.children.iter().any(|n| n.title == "Section One"));
+    }
+
+    #[test]
+    fn test_tight_list_content_is_captured() {
+        // Regression: tight (single-line) bullet items previously produced no
+        // Paragraph events and were silently dropped from the index.
+        let md = "## Features\n\n- fast startup times\n- zero configuration\n- async support\n\nTrailing paragraph.\n";
+        let doc = parse(md);
+        let section = &doc.root.children[0];
+        let combined: String =
+            section.blocks.iter().map(super::ContentBlock::text).collect::<Vec<_>>().join("\n");
+        assert!(combined.contains("fast startup times"), "bullet 1 lost: {combined:?}");
+        assert!(combined.contains("zero configuration"), "bullet 2 lost: {combined:?}");
+        assert!(combined.contains("async support"), "bullet 3 lost: {combined:?}");
+        assert!(combined.contains("Trailing paragraph."));
+    }
+
+    #[test]
+    fn test_generics_not_stripped_as_jsx() {
+        // Regression: `strip_jsx` used to delete `<T>`, `<String>` runs,
+        // corrupting generic-type mentions ubiquitous in Rust/TS docs.
+        let md = "## API\n\nUse Option<T> and Vec<String> where <T> is a generic parameter.\n";
+        let doc = parse(md);
+        let combined: String =
+            doc.root.children[0].blocks.iter().map(super::ContentBlock::text).collect();
+        assert!(combined.contains("Option<T>"), "Option<T> corrupted: {combined:?}");
+        assert!(combined.contains("Vec<String>"), "Vec<String> corrupted: {combined:?}");
+        assert!(combined.contains("<T>"), "bare <T> corrupted: {combined:?}");
+    }
+
+    #[test]
+    fn test_mdx_component_still_stripped() {
+        // The genuine MDX-tag case must still be stripped.
+        assert_eq!(strip_jsx("<AppOnly>Inside.</AppOnly>"), "Inside.");
+        assert_eq!(strip_jsx("<Callout type=\"info\">Note</Callout>"), "Note");
     }
 }
