@@ -86,6 +86,36 @@ build_one() {
             # Local builds CAN crawl; `lore update` drives the same path.
             "$LORE" build-website "$(yq -r '.source.url' "$spec")" "${build_args[@]}"
             ;;
+        rustdoc)
+            # Assemble a throwaway cargo project pinned to the exact version and
+            # let `build-rustdoc` document it (needs a nightly toolchain).
+            local rd_crate rd_ver rd_dir feat_toml
+            rd_crate=$(yq -r '.source.crate // ""' "$spec")
+            rd_ver=$(yq -r '.source.version // ""' "$spec")
+            local feats=()
+            while IFS= read -r f; do [ -n "$f" ] && feats+=("$f"); done \
+                < <(yq -r '.source.features[]? // empty' "$spec")
+            feat_toml=""
+            [ ${#feats[@]} -gt 0 ] && feat_toml=$(printf '"%s", ' "${feats[@]}")
+            rd_dir="$workdir/rd"
+            rm -rf "$rd_dir"; mkdir -p "$rd_dir/src"
+            cat > "$rd_dir/Cargo.toml" <<TOML
+[package]
+name = "lore-rustdoc-probe"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+$rd_crate = { version = "=$rd_ver", features = [${feat_toml%, }] }
+
+[lib]
+path = "src/lib.rs"
+TOML
+            echo "// lore rustdoc probe" > "$rd_dir/src/lib.rs"
+            "$LORE" build-rustdoc --crate "$rd_crate" --name "$name" \
+                --version "$version" --registry "$registry" --output "$db" \
+                --manifest-dir "$rd_dir"
+            ;;
         *)
             echo "error: unknown source type '$source_type' in $spec" >&2
             return 1

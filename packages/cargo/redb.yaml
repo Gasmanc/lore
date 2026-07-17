@@ -1,0 +1,9 @@
+name: redb
+registry: cargo
+version: "2.6.3"
+description: "A simple, portable, high-performance, ACID, embedded key-value store"
+source_url: "https://docs.rs/redb/2.6.3/redb/"
+source:
+  type: rustdoc
+  crate: redb
+  version: "2.6.3"

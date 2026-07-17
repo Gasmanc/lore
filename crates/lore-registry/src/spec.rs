@@ -69,6 +69,22 @@ pub enum SourceSpec {
         /// Absolute or relative path to the documentation directory.
         dir: String,
     },
+    /// Generate docs from a crate's `rustdoc --output-format json`.
+    ///
+    /// The build creates a throwaway cargo project pinned to `version` (with the
+    /// given `features`) and runs `cargo +nightly rustdoc`, so the indexed docs
+    /// are the exact locked-version API — reproducible on any machine with a
+    /// nightly toolchain.
+    Rustdoc {
+        /// Crate name on crates.io (e.g. `axum`).
+        #[serde(rename = "crate")]
+        crate_name: String,
+        /// Exact version to document (e.g. `0.8.9`).
+        version: String,
+        /// Cargo features to enable while documenting.
+        #[serde(default)]
+        features: Vec<String>,
+    },
 }
 
 /// Build-time options that can be overridden per package.
@@ -117,8 +133,29 @@ impl PackageSpec {
             }
             SourceSpec::Website { url, .. } => validate_source_url(url)?,
             SourceSpec::Local { .. } => {}
+            SourceSpec::Rustdoc { crate_name, version, features } => {
+                validate_crate_token(crate_name, "source.crate")?;
+                validate_crate_token(version, "source.version")?;
+                for f in features {
+                    validate_crate_token(f, "source.features")?;
+                }
+            }
         }
         Ok(())
+    }
+}
+
+/// Rejects a crate name / version / feature that could inject cargo arguments
+/// or shell metacharacters when the build assembles a throwaway project.
+fn validate_crate_token(token: &str, field: &str) -> Result<(), LoreError> {
+    let ok = !token.is_empty()
+        && token.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+'));
+    if ok {
+        Ok(())
+    } else {
+        Err(LoreError::InvalidConfig(format!(
+            "{field} '{token}' must be non-empty and match [A-Za-z0-9._+-]"
+        )))
     }
 }
 
@@ -223,6 +260,42 @@ source:
         let spec: PackageSpec = serde_yaml::from_str(WEBSITE_YAML).unwrap();
         assert_eq!(spec.name, "tokio");
         assert!(matches!(spec.source, SourceSpec::Website { max_pages: Some(200), .. }));
+    }
+
+    #[test]
+    fn parse_and_validate_rustdoc_spec() {
+        let yaml = r#"
+name: sqlx
+registry: cargo
+version: "0.8.6"
+source:
+  type: rustdoc
+  crate: sqlx
+  version: "0.8.6"
+  features: [runtime-tokio, tls-rustls, sqlite]
+"#;
+        let spec: PackageSpec = serde_yaml::from_str(yaml).unwrap();
+        assert!(matches!(
+            spec.source,
+            SourceSpec::Rustdoc { ref crate_name, ref version, .. }
+                if crate_name == "sqlx" && version == "0.8.6"
+        ));
+        assert!(spec.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_rustdoc_arg_injection() {
+        let yaml = r#"
+name: x
+registry: cargo
+version: "1"
+source:
+  type: rustdoc
+  crate: "--evil flag"
+  version: "1.0.0"
+"#;
+        let spec: PackageSpec = serde_yaml::from_str(yaml).unwrap();
+        assert!(spec.validate().is_err());
     }
 
     #[test]

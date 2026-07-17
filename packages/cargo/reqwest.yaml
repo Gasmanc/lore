@@ -1,0 +1,13 @@
+name: reqwest
+registry: cargo
+version: "0.13.4"
+description: "An ergonomic, batteries-included HTTP client for Rust"
+source_url: "https://docs.rs/reqwest/0.13.4/reqwest/"
+source:
+  type: rustdoc
+  crate: reqwest
+  version: "0.13.4"
+  features:
+    - rustls
+    - json
+    - stream

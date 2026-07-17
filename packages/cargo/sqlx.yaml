@@ -1,9 +1,20 @@
 name: sqlx
-registry: "cargo"
-version: "0.8.5"
+registry: cargo
+version: "0.8.6"
 description: "SQLx — async, compile-time checked SQL queries for Rust supporting PostgreSQL, MySQL, SQLite"
-source_url: "https://docs.rs/sqlx/latest/sqlx/"
+source_url: "https://docs.rs/sqlx/0.8.6/sqlx/"
 source:
-  type: git
-  url: "https://github.com/launchbadge/sqlx"
-  branch: main
+  type: rustdoc
+  crate: sqlx
+  version: "0.8.6"
+  features:
+    - runtime-tokio
+    - tls-rustls
+    - postgres
+    - sqlite
+    - mysql
+    - macros
+    - migrate
+    - chrono
+    - uuid
+    - json
